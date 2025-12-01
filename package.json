@@ -1,0 +1,17 @@
+{
+    "name": "investment-calculator",
+    "version": "1.0.0",
+    "description": "Real Estate Investment Calculator",
+    "main": "calculator.js",
+    "type": "module",
+    "scripts": {
+        "test": "node tests/unit/all.test.js",
+        "lint": "eslint src tests -c config/eslint.config.js",
+        "build": "esbuild src/ui/main.js --bundle --outfile=dist/bundle.js --format=iife"
+    },
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "esbuild": "^0.27.0"
+    }
+}
