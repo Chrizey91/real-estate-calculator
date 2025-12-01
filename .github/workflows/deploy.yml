@@ -26,25 +26,21 @@ jobs:
         with:
           node-version: "20"
           cache: 'npm'
-          cache-dependency-path: 'investment-calculator/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install Dependencies
-        working-directory: investment-calculator
         run: npm ci
 
       - name: Run Tests
-        working-directory: investment-calculator
         run: npm test
 
       - name: Build
-        working-directory: investment-calculator
         run: npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Prepare Deployment Artifact
-        working-directory: investment-calculator
         run: |
           mkdir _site
           cp index.html _site/
@@ -54,7 +50,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'investment-calculator/_site'
+          path: '_site'
 
   deploy:
     environment:
