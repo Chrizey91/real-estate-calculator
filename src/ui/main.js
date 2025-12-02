@@ -104,7 +104,57 @@ if (typeof document !== 'undefined') {
 
         // Initial calculation
         performCalculations();
+
+        // Navigation Logic
+        setupNavigation();
     });
+}
+
+function setupNavigation() {
+    const navLinks = document.querySelectorAll('.nav-links a');
+    const views = document.querySelectorAll('.view-section');
+    const startBtn = document.getElementById('startCalcBtn');
+
+    // Handle Nav Clicks
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const viewId = link.getAttribute('data-view');
+            switchView(viewId);
+        });
+    });
+
+    // Handle CTA Button
+    if (startBtn) {
+        startBtn.addEventListener('click', () => {
+            switchView('view-calculator');
+        });
+    }
+
+    function switchView(viewId) {
+        // Update Views
+        views.forEach(view => {
+            if (view.id === viewId) {
+                view.classList.remove('hidden');
+            } else {
+                view.classList.add('hidden');
+            }
+        });
+
+        // Update Nav State
+        navLinks.forEach(link => {
+            if (link.getAttribute('data-view') === viewId) {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
+
+        // If switching to calculator, ensure charts resize correctly
+        if (viewId === 'view-calculator') {
+            window.dispatchEvent(new Event('resize'));
+        }
+    }
 }
 
 /**
