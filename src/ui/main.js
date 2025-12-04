@@ -54,9 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         monthlyCashFlow: document.getElementById('monthlyCashFlow'),
         payoffTime: document.getElementById('payoffTime'),
         totalInterest: document.getElementById('totalInterest'),
-        breakEven: document.getElementById('breakEven'),
-        roi10: document.getElementById('roi10'),
-        annualTaxSavings: document.getElementById('annualTaxSavings')
+        breakEven: document.getElementById('breakEven')
     };
 
     // Calculate button
@@ -186,13 +184,16 @@ function updateResultsUI(metrics, displayCashFlow) {
     results.totalInvestment.textContent = formatCurrency(metrics.totalInvestment);
     results.monthlyCashFlow.textContent = formatCurrency(displayCashFlow);
     results.monthlyCashFlow.className = 'metric-value ' + (displayCashFlow >= 0 ? 'positive' : 'negative');
-    results.payoffTime.textContent = metrics.payoffYears.toFixed(1) + ' years';
-    results.totalInterest.textContent = formatCurrency(metrics.totalInterest);
+
+    // Payoff Time Display with year
+    const startYear = parseInt(inputs.startYear.value);
+    const payoffYear = startYear + Math.floor(metrics.payoffYears);
+    results.payoffTime.innerHTML = `Year ${payoffYear} \u003cspan style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">(${metrics.payoffYears.toFixed(1)} years)\u003c/span>`;
+
     results.totalInterest.textContent = formatCurrency(metrics.totalInterest);
 
     // Break-even Display
     if (metrics.breakEvenYears > 0) {
-        const startYear = parseInt(inputs.startYear.value);
         const breakEvenDateYear = startYear + Math.floor(metrics.breakEvenYears);
 
         // Calculate when max investment is reached
@@ -219,10 +220,7 @@ function updateResultsUI(metrics, displayCashFlow) {
  * @param {number} taxRate - Tax rate percentage
  */
 function updateTaxUI(taxCalc, taxRate) {
-    document.getElementById('taxSavingsCard').style.display = 'flex';
-    // Tax Breakdown removed
-    results.annualTaxSavings.textContent = formatCurrency(taxCalc.taxSavings);
-
+    // Show tax chart
     document.getElementById('taxSavingsChartContainer').style.display = 'block';
 }
 
@@ -230,8 +228,7 @@ function updateTaxUI(taxCalc, taxRate) {
  * Hides the tax savings section of the UI.
  */
 function hideTaxUI() {
-    document.getElementById('taxSavingsCard').style.display = 'none';
-    // Tax Breakdown removed
+    // Hide tax chart
     document.getElementById('taxSavingsChartContainer').style.display = 'none';
 }
 
@@ -527,7 +524,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
 
     // Tax Savings Chart
 
-    // Tax Savings Chart
+    // Tax Savings Chart - Detailed Breakdown
     if (showTaxChart && taxSavingsSchedule.length > 0) {
         const taxData = aggregateToYearlyData(taxSavingsSchedule);
 
@@ -539,24 +536,111 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                     const year = startYear + Math.floor(d.month / 12);
                     return year.toString();
                 }),
-                datasets: [{
-                    label: 'Annual Tax Savings',
-                    data: taxData.map(d => d.savings),
-                    backgroundColor: 'rgba(16, 185, 129, 0.6)',
-                    borderColor: '#10b981',
-                    borderWidth: 2
-                }]
+                datasets: [
+                    {
+                        label: 'Rental Income',
+                        data: taxData.map(d => d.annualRentalIncome),
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 2,
+                        stack: 'income'
+                    },
+                    {
+                        label: 'AfA (Depreciation)',
+                        data: taxData.map(d => d.annualDepreciation),
+                        backgroundColor: 'rgba(139, 92, 246, 0.7)',
+                        borderColor: '#8b5cf6',
+                        borderWidth: 1,
+                        stack: 'deductions'
+                    },
+                    {
+                        label: 'Mortgage Interest',
+                        data: taxData.map(d => d.annualInterest),
+                        backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                        borderColor: '#f59e0b',
+                        borderWidth: 1,
+                        stack: 'deductions'
+                    },
+                    {
+                        label: 'Other Expenses',
+                        data: taxData.map(d => d.annualExpenses),
+                        backgroundColor: 'rgba(234, 179, 8, 0.7)',
+                        borderColor: '#eab308',
+                        borderWidth: 1,
+                        stack: 'deductions'
+                    },
+                    {
+                        label: 'Taxable Income',
+                        data: taxData.map(d => d.taxableIncome),
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderColor: '#ef4444',
+                        borderWidth: 2,
+                        stack: 'result'
+                    },
+                    {
+                        label: 'Deductible Overflow',
+                        data: taxData.map(d => d.deductibleOverflow),
+                        backgroundColor: 'rgba(148, 163, 184, 0.5)',
+                        borderColor: '#94a3b8',
+                        borderWidth: 1,
+                        stack: 'result'
+                    },
+                    {
+                        label: 'Tax Returns',
+                        data: taxData.map(d => d.taxReturns),
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        stack: 'result'
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#94a3b8',
+                            usePointStyle: true,
+                            padding: 10,
+                            font: {
+                                size: 11
+                            }
+                        }
                     },
                     tooltip: {
                         callbacks: {
-                            label: (context) => formatCurrency(context.parsed.y)
+                            title: (tooltipItems) => {
+                                return 'Year ' + tooltipItems[0].label;
+                            },
+                            label: (context) => {
+                                const label = context.dataset.label || '';
+                                const value = context.parsed.y;
+                                if (value === 0) return null; // Hide zero values
+                                return label + ': ' + formatCurrency(value);
+                            },
+                            footer: (tooltipItems) => {
+                                const index = tooltipItems[0].dataIndex;
+                                const data = taxData[index];
+                                const lines = [];
+                                lines.push('─────────────────');
+                                lines.push('Income: ' + formatCurrency(data.annualRentalIncome));
+                                lines.push('Deductions: ' + formatCurrency(data.totalDeductible));
+                                if (data.taxableIncome > 0) {
+                                    lines.push('→ Taxable: ' + formatCurrency(data.taxableIncome));
+                                } else {
+                                    lines.push('→ Loss: ' + formatCurrency(data.deductibleOverflow));
+                                    lines.push('→ Tax Return: ' + formatCurrency(data.taxReturns));
+                                }
+                                return lines;
+                            }
                         }
                     }
                 },
@@ -570,7 +654,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                     y: {
                         title: {
                             display: true,
-                            text: 'Tax Savings (€)'
+                            text: 'Amount (€)'
                         },
                         ticks: {
                             callback: (value) => formatCurrency(value)

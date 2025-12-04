@@ -43,11 +43,28 @@ export function calculateTaxSavingsByYear(amortization, buildingValue, annualExp
         const yearData = yearlyData[year];
         const taxCalc = calculateGermanTaxSavings(buildingValue, yearData.interest, annualExpenses, taxRate, annualRentalIncome);
 
+        // Calculate components for visualization
+        const netRentalResult = taxCalc.netRentalResult;
+        const isProfit = netRentalResult > 0;
+        const taxableIncome = isProfit ? netRentalResult : 0;
+        const deductibleOverflow = isProfit ? 0 : Math.abs(netRentalResult);
+        const taxReturns = taxCalc.taxSavings;
+
         // Add entry for each month in this year
         yearData.months.forEach(monthIdx => {
             schedule.push({
                 month: monthIdx,
-                savings: taxCalc.taxSavings
+                savings: taxCalc.taxSavings,
+                totalDeductible: taxCalc.totalDeductible,
+                // Detailed breakdown
+                annualRentalIncome: taxCalc.annualRentalIncome,
+                annualDepreciation: taxCalc.annualDepreciation,
+                annualInterest: taxCalc.annualInterest,
+                annualExpenses: taxCalc.annualExpenses,
+                netRentalResult: netRentalResult,
+                taxableIncome: taxableIncome,
+                deductibleOverflow: deductibleOverflow,
+                taxReturns: taxReturns
             });
         });
     });
