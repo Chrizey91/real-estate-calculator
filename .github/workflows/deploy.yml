@@ -44,6 +44,9 @@ jobs:
         run: |
           mkdir _site
           cp index.html _site/
+          cp calculator.html _site/
+          cp about.html _site/
+          cp impressum.html _site/
           cp styles.css _site/
           cp -r dist _site/
           cp -r images _site/
