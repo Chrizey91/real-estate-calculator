@@ -20,142 +20,112 @@ import {
 import { calculateOptimalScenario } from '../core/optimization.js';
 
 // Chart instances
-let debtChart, cashFlowChart, roiChart, taxSavingsChart, monthlyCashFlowChart;
+let debtChart, cashFlowChart, taxSavingsChart, monthlyCashFlowChart;
 
 // DOM elements - only initialized in browser environment
 let inputs = {};
 let results = {};
 let calculateBtn;
 
-// Initialize DOM elements and listeners if in browser
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        // Get all input elements
-        inputs = {
-            propertyWorth: document.getElementById('propertyWorth'),
-            purchasePrice: document.getElementById('purchasePrice'),
-            additionalCosts: document.getElementById('additionalCosts'),
-            expectedRent: document.getElementById('expectedRent'),
-            startMonth: document.getElementById('startMonth'),
-            startYear: document.getElementById('startYear'),
-            debtAmount: document.getElementById('debtAmount'),
-            monthlyPayment: document.getElementById('monthlyPayment'),
-            interestRate: document.getElementById('interestRate'),
-            applyGermanTax: document.getElementById('applyGermanTax'),
-            buildingValue: document.getElementById('buildingValue'),
-            taxRate: document.getElementById('taxRate'),
-            annualExpenses: document.getElementById('annualExpenses'),
-            targetCashFlow: document.getElementById('targetCashFlow'),
-            targetRepayment: document.getElementById('targetRepayment')
-        };
+// Initialize DOM elements and listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Get all input elements
+    inputs = {
+        propertyWorth: document.getElementById('propertyWorth'),
+        purchasePrice: document.getElementById('purchasePrice'),
+        additionalCosts: document.getElementById('additionalCosts'),
+        expectedRent: document.getElementById('expectedRent'),
+        startMonth: document.getElementById('startMonth'),
+        startYear: document.getElementById('startYear'),
+        debtAmount: document.getElementById('debtAmount'),
+        monthlyPayment: document.getElementById('monthlyPayment'),
+        interestRate: document.getElementById('interestRate'),
+        applyGermanTax: document.getElementById('applyGermanTax'),
+        buildingValue: document.getElementById('buildingValue'),
+        taxRate: document.getElementById('taxRate'),
+        annualExpenses: document.getElementById('annualExpenses'),
+        targetCashFlow: document.getElementById('targetCashFlow'),
+        targetRepayment: document.getElementById('targetRepayment')
+    };
 
-        // Get result elements
-        results = {
-            totalInvestment: document.getElementById('totalInvestment'),
-            monthlyCashFlow: document.getElementById('monthlyCashFlow'),
-            payoffTime: document.getElementById('payoffTime'),
-            totalInterest: document.getElementById('totalInterest'),
-            breakEven: document.getElementById('breakEven'),
-            roi10: document.getElementById('roi10'),
-            annualTaxSavings: document.getElementById('annualTaxSavings')
-        };
+    // Get result elements
+    results = {
+        totalInvestment: document.getElementById('totalInvestment'),
+        monthlyCashFlow: document.getElementById('monthlyCashFlow'),
+        payoffTime: document.getElementById('payoffTime'),
+        totalInterest: document.getElementById('totalInterest'),
+        breakEven: document.getElementById('breakEven'),
+        roi10: document.getElementById('roi10'),
+        annualTaxSavings: document.getElementById('annualTaxSavings')
+    };
 
-        // Calculate button
-        calculateBtn = document.getElementById('calculateBtn');
-        if (calculateBtn) {
-            calculateBtn.addEventListener('click', performCalculations);
-        }
+    // Calculate button
+    calculateBtn = document.getElementById('calculateBtn');
+    if (calculateBtn) {
+        calculateBtn.addEventListener('click', performCalculations);
+    }
 
-        // Optimize button
-        const optimizeBtn = document.getElementById('optimizeBtn');
-        if (optimizeBtn) {
-            optimizeBtn.addEventListener('click', handleOptimization);
-        }
+    // Optimize button
+    const optimizeBtn = document.getElementById('optimizeBtn');
+    if (optimizeBtn) {
+        optimizeBtn.addEventListener('click', handleOptimization);
+    }
 
-        // Add event listeners to inputs for real-time updates
-        Object.values(inputs).forEach(input => {
-            if (input) {
-                input.addEventListener('input', () => {
-                    // Debounce for better performance
-                    if (input.debounceTimer) clearTimeout(input.debounceTimer);
-                    input.debounceTimer = setTimeout(performCalculations, 500);
-                });
+    // Add event listeners to inputs for real-time updates
+    Object.values(inputs).forEach(input => {
+        if (input) {
+            input.addEventListener('input', () => {
+                // Debounce for better performance
+                if (input.debounceTimer) clearTimeout(input.debounceTimer);
+                input.debounceTimer = setTimeout(performCalculations, 500);
+            });
 
-                if (input.type === 'checkbox') {
-                    input.addEventListener('change', function () {
-                        if (this.id === 'applyGermanTax') {
-                            const taxFields = document.getElementById('taxFields');
-                            if (taxFields) {
-                                taxFields.style.display = this.checked ? 'block' : 'none';
-                            }
+            if (input.type === 'checkbox') {
+                input.addEventListener('change', function () {
+                    if (this.id === 'applyGermanTax') {
+                        const taxFields = document.getElementById('taxFields');
+                        if (taxFields) {
+                            taxFields.style.display = this.checked ? 'block' : 'none';
                         }
-                        performCalculations();
-                    });
-                }
+                    }
+                    performCalculations();
+                });
             }
-        });
-
-        // Chart.js default config
-        if (typeof Chart !== 'undefined') {
-            Chart.defaults.color = '#94a3b8';
-            Chart.defaults.borderColor = '#475569';
-            Chart.defaults.font.family = 'Inter, sans-serif';
         }
+    });
 
-        // Initial calculation
+    // Chart.js default config
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = '#475569';
+        Chart.defaults.font.family = 'Inter, sans-serif';
+    }
+
+    // Initial calculation (only on calculator page)
+    if (calculateBtn) {
         performCalculations();
-
-        // Navigation Logic
-        setupNavigation();
-    });
-}
-
-function setupNavigation() {
-    const navLinks = document.querySelectorAll('.nav-links a');
-    const views = document.querySelectorAll('.view-section');
-    const startBtn = document.getElementById('startCalcBtn');
-
-    // Handle Nav Clicks
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const viewId = link.getAttribute('data-view');
-            switchView(viewId);
-        });
-    });
-
-    // Handle CTA Button
-    if (startBtn) {
-        startBtn.addEventListener('click', () => {
-            switchView('view-calculator');
-        });
     }
 
-    function switchView(viewId) {
-        // Update Views
-        views.forEach(view => {
-            if (view.id === viewId) {
-                view.classList.remove('hidden');
-            } else {
-                view.classList.add('hidden');
-            }
+    // Mobile Menu Toggle (works on all pages)
+    const mobileBtn = document.querySelector('.mobile-menu-btn');
+    const navLinksContainer = document.querySelector('.nav-links');
+
+    if (mobileBtn && navLinksContainer) {
+        mobileBtn.addEventListener('click', () => {
+            navLinksContainer.classList.toggle('nav-active');
+            mobileBtn.classList.toggle('active');
         });
 
-        // Update Nav State
+        // Close menu when clicking a link
+        const navLinks = document.querySelectorAll('.nav-links a');
         navLinks.forEach(link => {
-            if (link.getAttribute('data-view') === viewId) {
-                link.classList.add('active');
-            } else {
-                link.classList.remove('active');
-            }
+            link.addEventListener('click', () => {
+                navLinksContainer.classList.remove('nav-active');
+                mobileBtn.classList.remove('active');
+            });
         });
-
-        // If switching to calculator, ensure charts resize correctly
-        if (viewId === 'view-calculator') {
-            window.dispatchEvent(new Event('resize'));
-        }
     }
-}
+});
 
 /**
  * Retrieves and parses all input values from the DOM.
@@ -218,8 +188,29 @@ function updateResultsUI(metrics, displayCashFlow) {
     results.monthlyCashFlow.className = 'metric-value ' + (displayCashFlow >= 0 ? 'positive' : 'negative');
     results.payoffTime.textContent = metrics.payoffYears.toFixed(1) + ' years';
     results.totalInterest.textContent = formatCurrency(metrics.totalInterest);
-    results.breakEven.textContent = metrics.breakEvenYears > 0 ? metrics.breakEvenYears.toFixed(1) + ' years' : 'Never';
-    results.roi10.textContent = formatPercentage(metrics.roi10Years);
+    results.totalInterest.textContent = formatCurrency(metrics.totalInterest);
+
+    // Break-even Display
+    if (metrics.breakEvenYears > 0) {
+        const startYear = parseInt(inputs.startYear.value);
+        const breakEvenDateYear = startYear + Math.floor(metrics.breakEvenYears);
+
+        // Calculate when max investment is reached
+        const maxInvestmentYears = metrics.maxInvestmentAtYears || 0;
+        const maxInvestmentYear = startYear + Math.floor(maxInvestmentYears);
+
+        results.breakEven.innerHTML = `
+            Year ${breakEvenDateYear} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">(${metrics.breakEvenYears.toFixed(1)} years)</span>
+            <div style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--text-secondary); font-weight: normal;">
+                Max investment: ${formatCurrency(metrics.maxInvestmentNeeded)}<br>
+                <span style="font-size: 0.75rem;">Reached in year ${maxInvestmentYear} (after ${maxInvestmentYears.toFixed(1)} years)</span>
+            </div>
+        `;
+    } else {
+        results.breakEven.textContent = 'Never';
+    }
+
+    // ROI removed
 }
 
 /**
@@ -229,15 +220,8 @@ function updateResultsUI(metrics, displayCashFlow) {
  */
 function updateTaxUI(taxCalc, taxRate) {
     document.getElementById('taxSavingsCard').style.display = 'flex';
-    document.getElementById('taxBreakdown').style.display = 'block';
+    // Tax Breakdown removed
     results.annualTaxSavings.textContent = formatCurrency(taxCalc.taxSavings);
-
-    document.getElementById('afaAmount').textContent = formatCurrency(taxCalc.annualDepreciation);
-    document.getElementById('interestAmount').textContent = formatCurrency(taxCalc.annualInterest);
-    document.getElementById('expensesAmount').textContent = formatCurrency(taxCalc.annualExpenses);
-    document.getElementById('totalDeductible').textContent = formatCurrency(taxCalc.totalDeductible);
-    document.getElementById('displayTaxRate').textContent = taxRate;
-    document.getElementById('taxSavingsBreakdown').textContent = formatCurrency(taxCalc.taxSavings);
 
     document.getElementById('taxSavingsChartContainer').style.display = 'block';
 }
@@ -247,7 +231,7 @@ function updateTaxUI(taxCalc, taxRate) {
  */
 function hideTaxUI() {
     document.getElementById('taxSavingsCard').style.display = 'none';
-    document.getElementById('taxBreakdown').style.display = 'none';
+    // Tax Breakdown removed
     document.getElementById('taxSavingsChartContainer').style.display = 'none';
 }
 
@@ -300,7 +284,7 @@ function performCalculations() {
     updateCharts(
         amortization,
         metrics.cashFlowSchedule,
-        metrics.roiSchedule,
+        null, // ROI schedule removed
         taxSavingsSchedule,
         params.applyGermanTax,
         params.startMonth,
@@ -537,55 +521,11 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
         }
     });
 
-    // ROI Chart - yearly data
-    const roiData = aggregateToYearlyData(roiSchedule);
 
-    if (roiChart) roiChart.destroy();
-    roiChart = new Chart(document.getElementById('roiChart'), {
-        type: 'line',
-        data: {
-            labels: roiData.map(d => formatDate(startMonth, startYear, d.month)),
-            datasets: [{
-                label: 'Return on Investment',
-                data: roiData.map(d => d.roi),
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => formatPercentage(context.parsed.y)
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Years'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'ROI (%)'
-                    },
-                    ticks: {
-                        callback: (value) => formatPercentage(value)
-                    }
-                }
-            }
-        }
-    });
+
+    // ROI Chart removed
+
+    // Tax Savings Chart
 
     // Tax Savings Chart
     if (showTaxChart && taxSavingsSchedule.length > 0) {

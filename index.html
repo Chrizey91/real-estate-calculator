@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real Estate Investment Calculator</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -14,22 +13,26 @@
         <header>
             <nav class="main-nav">
                 <div class="nav-logo">InvestmentCalc</div>
+                <button class="mobile-menu-btn" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
                 <ul class="nav-links">
-                    <li><a href="#" data-view="view-home" class="active">Home</a></li>
-                    <li><a href="#" data-view="view-calculator">Calculator</a></li>
-                    <li><a href="#" data-view="view-about">About</a></li>
-                    <li><a href="#" data-view="view-impressum">Impressum</a></li>
+                    <li><a href="index.html" class="active">Home</a></li>
+                    <li><a href="calculator.html">Calculator</a></li>
+                    <li><a href="about.html">About</a></li>
+                    <li><a href="impressum.html">Impressum</a></li>
                 </ul>
             </nav>
         </header>
 
         <main class="content-wrapper">
-            <!-- Home View -->
-            <div id="view-home" class="view-section">
+            <div>
                 <section class="hero">
                     <h1>Real Estate Investment Calculator</h1>
                     <p class="subtitle">Make data-driven decisions for your property investments.</p>
-                    <button id="startCalcBtn" class="btn-primary cta-button">Start Calculator</button>
+                    <a href="calculator.html" class="btn-primary cta-button">Start Calculator</a>
                 </section>
 
                 <section class="how-it-works">
@@ -100,322 +103,10 @@
                     </div>
                 </section>
             </div>
-
-            <!-- Calculator View -->
-            <div id="view-calculator" class="view-section hidden">
-                <div class="content-grid">
-                    <!-- Input Section -->
-                    <section class="card input-section">
-                        <h2>Investment Details</h2>
-
-                        <div class="form-group">
-                            <label for="propertyWorth">Property Worth (Market Value)</label>
-                            <div class="input-wrapper">
-                                <span class="currency">€</span>
-                                <input type="number" id="propertyWorth" value="400000" step="1000">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="purchasePrice">Purchase Price (Amount Paid)</label>
-                            <div class="input-wrapper">
-                                <span class="currency">€</span>
-                                <input type="number" id="purchasePrice" value="380000" step="1000">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="additionalCosts">Additional Costs (Closing, Renovation, etc.)</label>
-                            <div class="input-wrapper">
-                                <span class="currency">€</span>
-                                <input type="number" id="additionalCosts" value="20000" step="1000">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="expectedRent">Expected Monthly Rent</label>
-                            <div class="input-wrapper">
-                                <span class="currency">€</span>
-                                <input type="number" id="expectedRent" value="2000" step="50">
-                            </div>
-                        </div>
-
-                        <h3>Investment Start Date</h3>
-
-                        <div class="date-inputs">
-                            <div class="form-group">
-                                <label for="startMonth">Month</label>
-                                <select id="startMonth">
-                                    <option value="0">January</option>
-                                    <option value="1">February</option>
-                                    <option value="2">March</option>
-                                    <option value="3">April</option>
-                                    <option value="4">May</option>
-                                    <option value="5">June</option>
-                                    <option value="6">July</option>
-                                    <option value="7">August</option>
-                                    <option value="8">September</option>
-                                    <option value="9">October</option>
-                                    <option value="10">November</option>
-                                    <option value="11" selected>December</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="startYear">Year</label>
-                                <input type="number" id="startYear" value="2025" min="2020" max="2050">
-                            </div>
-                        </div>
-
-                        <h3>Debt Information</h3>
-
-                        <div class="form-group">
-                            <label for="debtAmount">Total Debt Amount</label>
-                            <div class="input-wrapper">
-                                <span class="currency">€</span>
-                                <input type="number" id="debtAmount" value="320000" step="1000">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="monthlyPayment">Monthly Debt Payment</label>
-                            <div class="input-wrapper">
-                                <span class="currency">€</span>
-                                <input type="number" id="monthlyPayment" value="1500" step="50">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="interestRate">Annual Interest Rate</label>
-                            <div class="input-wrapper">
-                                <input type="number" id="interestRate" value="3.5" step="0.1">
-                                <span class="currency">%</span>
-                            </div>
-                        </div>
-
-                        <h3>German Tax Benefits</h3>
-
-                        <div class="form-group checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="applyGermanTax">
-                                <span>Apply German Tax Relief (AfA & Deductions)</span>
-                            </label>
-                        </div>
-
-                        <div id="taxFields" class="tax-fields" style="display: none;">
-                            <div class="form-group">
-                                <label for="buildingValue">Building Value (excl. Land)</label>
-                                <div class="input-wrapper">
-                                    <span class="currency">€</span>
-                                    <input type="number" id="buildingValue" value="300000" step="1000">
-                                </div>
-                                <small class="help-text">Only the building depreciates, not the land</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="taxRate">Personal Income Tax Rate</label>
-                                <div class="input-wrapper">
-                                    <input type="number" id="taxRate" value="30" step="1" min="0" max="45">
-                                    <span class="currency">%</span>
-                                </div>
-                                <small class="help-text">Your marginal tax rate (25-45%)</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="annualExpenses">Annual Deductible Expenses</label>
-                                <div class="input-wrapper">
-                                    <span class="currency">€</span>
-                                    <input type="number" id="annualExpenses" value="2000" step="100">
-                                </div>
-                                <small class="help-text">Maintenance, insurance, property tax, etc.</small>
-                            </div>
-                        </div>
-
-                        <div class="optimization-targets">
-                            <h3>Optimization Targets</h3>
-                            <div class="form-group">
-                                <label for="targetCashFlow">Target Monthly Cash Flow</label>
-                                <div class="input-wrapper">
-                                    <span class="currency">€</span>
-                                    <input type="number" id="targetCashFlow" value="0" step="10">
-                                </div>
-                                <small class="help-text">Desired profit after tax (0 for break-even)</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="targetRepayment">Target Initial Repayment</label>
-                                <div class="input-wrapper">
-                                    <input type="number" id="targetRepayment" value="2.0" step="0.1" min="0">
-                                    <span class="currency">%</span>
-                                </div>
-                                <small class="help-text">Desired amortization rate</small>
-                            </div>
-                        </div>
-
-                        <div class="button-group">
-                            <button id="optimizeBtn" class="btn-secondary">Optimize for Tenant</button>
-                            <button id="calculateBtn" class="btn-primary">Calculate</button>
-                        </div>
-                    </section>
-
-                    <!-- Results Section -->
-                    <section class="card results-section">
-                        <h2>Financial Overview</h2>
-
-                        <div class="metrics-grid">
-                            <div class="metric-card">
-                                <span class="metric-label">Total Investment</span>
-                                <span class="metric-value" id="totalInvestment">€0</span>
-                            </div>
-
-                            <div class="metric-card">
-                                <span class="metric-label">Monthly Cash Flow</span>
-                                <span class="metric-value" id="monthlyCashFlow">€0</span>
-                            </div>
-
-                            <div class="metric-card">
-                                <span class="metric-label">Time to Payoff</span>
-                                <span class="metric-value" id="payoffTime">0 years</span>
-                            </div>
-
-                            <div class="metric-card">
-                                <span class="metric-label">Total Interest Paid</span>
-                                <span class="metric-value" id="totalInterest">€0</span>
-                            </div>
-
-                            <div class="metric-card">
-                                <span class="metric-label">Break-even Point</span>
-                                <span class="metric-value" id="breakEven">0 years</span>
-                            </div>
-
-                            <div class="metric-card">
-                                <span class="metric-label">ROI (10 years)</span>
-                                <span class="metric-value" id="roi10">0%</span>
-                            </div>
-
-                            <div class="metric-card" id="taxSavingsCard" style="display: none;">
-                                <span class="metric-label">Annual Tax Savings</span>
-                                <span class="metric-value positive" id="annualTaxSavings">€0</span>
-                            </div>
-                        </div>
-
-                        <!-- Tax Breakdown Section -->
-                        <div id="taxBreakdown" class="tax-breakdown" style="display: none;">
-                            <h3>Tax Deduction Breakdown</h3>
-                            <div class="breakdown-items">
-                                <div class="breakdown-item">
-                                    <div class="breakdown-label">
-                                        <span class="icon">🏗️</span>
-                                        <span>Building Depreciation (AfA 2%)</span>
-                                    </div>
-                                    <div class="breakdown-value" id="afaAmount">€0</div>
-                                </div>
-                                <div class="breakdown-item">
-                                    <div class="breakdown-label">
-                                        <span class="icon">💰</span>
-                                        <span>Mortgage Interest</span>
-                                    </div>
-                                    <div class="breakdown-value" id="interestAmount">€0</div>
-                                </div>
-                                <div class="breakdown-item">
-                                    <div class="breakdown-label">
-                                        <span class="icon">🔧</span>
-                                        <span>Other Expenses</span>
-                                    </div>
-                                    <div class="breakdown-value" id="expensesAmount">€0</div>
-                                </div>
-                                <div class="breakdown-separator"></div>
-                                <div class="breakdown-item total">
-                                    <div class="breakdown-label">
-                                        <strong>Total Deductible</strong>
-                                    </div>
-                                    <div class="breakdown-value" id="totalDeductible">€0</div>
-                                </div>
-                                <div class="breakdown-item highlight">
-                                    <div class="breakdown-label">
-                                        <span class="icon">✅</span>
-                                        <strong>Tax Savings (at <span id="displayTaxRate">30</span>%)</strong>
-                                    </div>
-                                    <div class="breakdown-value positive" id="taxSavingsBreakdown">€0</div>
-                                </div>
-                            </div>
-                            <p class="breakdown-note">
-                                💡 <strong>How it works:</strong> These amounts reduce your taxable income.
-                                The tax savings = Total Deductible × Your Tax Rate
-                            </p>
-                        </div>
-                    </section>
-                </div>
-
-                <!-- Charts Section -->
-                <div class="charts-grid">
-                    <section class="card chart-container">
-                        <h3>Debt Payoff Timeline</h3>
-                        <canvas id="debtChart"></canvas>
-                    </section>
-
-                    <section class="card chart-container">
-                        <h3>Monthly Cash Flow</h3>
-                        <canvas id="monthlyCashFlowChart"></canvas>
-                    </section>
-
-                    <section class="card chart-container">
-                        <h3>Cumulative Cash Flow</h3>
-                        <canvas id="cashFlowChart"></canvas>
-                    </section>
-
-                    <section class="card chart-container" id="taxSavingsChartContainer" style="display: none;">
-                        <h3>Annual Tax Savings Over Time</h3>
-                        <canvas id="taxSavingsChart"></canvas>
-                    </section>
-
-                    <section class="card chart-container full-width">
-                        <h3>Return on Investment Over Time</h3>
-                        <canvas id="roiChart"></canvas>
-                    </section>
-                </div>
-            </div>
-
-            <!-- About View -->
-            <div id="view-about" class="view-section hidden">
-                <section class="card">
-                    <h2>About This Tool</h2>
-                    <p>This Real Estate Investment Calculator is designed to help investors analyze the financial
-                        viability of property investments.</p>
-                    <br>
-                    <h3>Key Features</h3>
-                    <ul>
-                        <li><strong>Cash Flow Analysis:</strong> Calculate monthly and cumulative cash flow.</li>
-                        <li><strong>Tax Benefits:</strong> Estimate tax savings based on German tax laws (AfA).</li>
-                        <li><strong>Optimization:</strong> Find the optimal rent or repayment rate for your goals.</li>
-                        <li><strong>Visualization:</strong> Interactive charts for debt, cash flow, and ROI.</li>
-                    </ul>
-                </section>
-            </div>
-
-            <!-- Impressum View -->
-            <div id="view-impressum" class="view-section hidden">
-                <section class="card">
-                    <h2>Impressum</h2>
-                    <p><strong>Angaben gemäß § 5 TMG</strong></p>
-                    <br>
-                    <p>Christopher Jürges</p>
-                    <p>Musterstraße 1</p>
-                    <p>12345 Musterstadt</p>
-                    <br>
-                    <p><strong>Kontakt</strong></p>
-                    <p>Telefon: +49 (0) 123 456789</p>
-                    <p>E-Mail: info@example.com</p>
-                    <br>
-                    <p><strong>Haftungsausschluss</strong></p>
-                    <p>Die Inhalte dieses Rechners wurden mit größter Sorgfalt erstellt. Für die Richtigkeit,
-                        Vollständigkeit und Aktualität der Inhalte können wir jedoch keine Gewähr übernehmen. Die
-                        Berechnungen stellen keine Finanzberatung dar.</p>
-                </section>
-            </div>
         </main>
     </div>
 
-    <script src="dist/bundle.js"></script>
+    <script src="dist/bundle.js?v=20241204145400"></script>
 </body>
 
 </html>

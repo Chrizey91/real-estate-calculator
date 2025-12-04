@@ -177,6 +177,14 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
     const breakEvenMonth = cashFlowSchedule.findIndex(item => item.cumulative >= 0);
     const breakEvenYears = breakEvenMonth >= 0 ? breakEvenMonth / 12 : 0;
 
+    // Calculate max investment needed (lowest point of cumulative cash flow)
+    const minCumulative = Math.min(...cashFlowSchedule.map(item => item.cumulative));
+    const maxInvestmentNeeded = Math.abs(minCumulative);
+
+    // Find when max investment is reached (month of lowest cumulative cash flow)
+    const maxInvestmentMonth = cashFlowSchedule.findIndex(item => item.cumulative === minCumulative);
+    const maxInvestmentAtYears = maxInvestmentMonth >= 0 ? maxInvestmentMonth / 12 : 0;
+
     // Calculate ROI over time
     const roiSchedule = [];
     for (let month = 0; month <= MAX_MONTHS; month++) {
@@ -197,6 +205,8 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
         payoffYears,
         totalInterest,
         breakEvenYears,
+        maxInvestmentNeeded,
+        maxInvestmentAtYears,
         roi10Years,
         monthlyCashFlowSchedule,
         cashFlowSchedule,
