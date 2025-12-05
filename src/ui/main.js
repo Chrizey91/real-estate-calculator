@@ -12,7 +12,7 @@ import {
 
 import {
     calculateTaxSavingsByYear,
-    aggregateToYearlyData,
+    aggregateToCalendarYears,
     extendAmortizationSchedule,
     calculateInvestmentMetrics
 } from '../data/transformations.js';
@@ -51,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get result elements
     results = {
         totalInvestment: document.getElementById('totalInvestment'),
-        monthlyCashFlow: document.getElementById('monthlyCashFlow'),
         payoffTime: document.getElementById('payoffTime'),
         totalInterest: document.getElementById('totalInterest'),
         breakEven: document.getElementById('breakEven')
@@ -178,12 +177,9 @@ function handleOptimization() {
 /**
  * Updates the results section of the UI.
  * @param {Object} metrics - Calculated investment metrics
- * @param {number} displayCashFlow - Cash flow value to display
  */
-function updateResultsUI(metrics, displayCashFlow) {
+function updateResultsUI(metrics) {
     results.totalInvestment.textContent = formatCurrency(metrics.totalInvestment);
-    results.monthlyCashFlow.textContent = formatCurrency(displayCashFlow);
-    results.monthlyCashFlow.className = 'metric-value ' + (displayCashFlow >= 0 ? 'positive' : 'negative');
 
     // Payoff Time Display with year
     const startYear = parseInt(inputs.startYear.value);
@@ -257,18 +253,17 @@ function performCalculations() {
     // Calculate comprehensive metrics
     const metrics = calculateInvestmentMetrics(params, amortization, getMonthsInYear);
 
-    // Display average monthly cash flow (or first month if available)
-    const displayCashFlow = metrics.monthlyCashFlowSchedule.length > 0
-        ? metrics.monthlyCashFlowSchedule[0].cashFlow
-        : (params.expectedRent - params.monthlyPayment);
-
     // Update results UI
-    updateResultsUI(metrics, displayCashFlow);
+    updateResultsUI(metrics);
+
+    // Extend amortization to 40 years for consistent chart duration
+    const extendedAmortization = extendAmortizationSchedule(amortization, 480);
 
     // Calculate tax savings by calendar year (if applicable)
+    // Use extended amortization to ensure tax chart covers the same 40-year period as other charts
     const taxSavingsSchedule = params.applyGermanTax
         ? calculateTaxSavingsByYear(
-            amortization,
+            extendedAmortization,
             params.buildingValue,
             params.annualExpenses,
             params.taxRate,
@@ -294,14 +289,14 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
     // Extend amortization to 40 years if shorter
     const extendedAmortization = extendAmortizationSchedule(amortization, 480);
 
-    // Debt Chart with Interest and Principal breakdown - yearly data
-    const debtData = aggregateToYearlyData(extendedAmortization);
+    // Debt Chart - Calendar Year Aggregation
+    const debtData = aggregateToCalendarYears(extendedAmortization, startMonth, startYear);
 
     if (debtChart) debtChart.destroy();
     debtChart = new Chart(document.getElementById('debtChart'), {
         type: 'line',
         data: {
-            labels: debtData.map(d => formatDate(startMonth, startYear, d.month)),
+            labels: debtData.map(d => d.year.toString()),
             datasets: [
                 {
                     label: 'Remaining Debt',
@@ -358,7 +353,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 x: {
                     title: {
                         display: true,
-                        text: 'Years'
+                        text: 'Year'
                     }
                 },
                 y: {
@@ -374,14 +369,14 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
         }
     });
 
-    // Detailed Cash Flow Chart with breakdown - yearly data
-    const monthlyData = aggregateToYearlyData(monthlyCashFlowSchedule);
+    // Detailed Cash Flow Chart - Calendar Year Aggregation
+    const monthlyData = aggregateToCalendarYears(monthlyCashFlowSchedule, startMonth, startYear);
 
     if (monthlyCashFlowChart) monthlyCashFlowChart.destroy();
     monthlyCashFlowChart = new Chart(document.getElementById('monthlyCashFlowChart'), {
         type: 'line',
         data: {
-            labels: monthlyData.map(d => formatDate(startMonth, startYear, d.month)),
+            labels: monthlyData.map(d => d.year.toString()),
             datasets: [
                 {
                     label: 'Annual Rent Income',
@@ -419,7 +414,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                     label: 'Annual Net Cash Flow',
                     data: monthlyData.map(d => d.annualNetCashFlow),
                     borderColor: '#8b5cf6',
-                    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
                     fill: true,
                     tension: 0.4,
                     borderWidth: 3
@@ -436,10 +431,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                     labels: {
                         color: '#94a3b8',
                         usePointStyle: true,
-                        padding: 10,
-                        font: {
-                            size: 11
-                        }
+                        padding: 15
                     }
                 },
                 tooltip: {
@@ -452,7 +444,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 x: {
                     title: {
                         display: true,
-                        text: 'Years'
+                        text: 'Year'
                     }
                 },
                 y: {
@@ -468,19 +460,17 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
         }
     });
 
-    // Cumulative Cash Flow Chart - yearly data
-    const cashFlowData = aggregateToYearlyData(cashFlowSchedule);
-
+    // Cumulative Cash Flow Chart - Uses same aggregated data
     if (cashFlowChart) cashFlowChart.destroy();
     cashFlowChart = new Chart(document.getElementById('cashFlowChart'), {
         type: 'line',
         data: {
-            labels: cashFlowData.map(d => formatDate(startMonth, startYear, d.month)),
+            labels: monthlyData.map(d => d.year.toString()),
             datasets: [{
                 label: 'Cumulative Cash Flow',
-                data: cashFlowData.map(d => d.cumulative),
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                data: monthlyData.map(d => d.cumulative),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
                 tension: 0.4
             }]
@@ -490,7 +480,13 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    display: false
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        color: '#94a3b8',
+                        usePointStyle: true,
+                        padding: 15
+                    }
                 },
                 tooltip: {
                     callbacks: {
@@ -502,7 +498,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 x: {
                     title: {
                         display: true,
-                        text: 'Years'
+                        text: 'Year'
                     }
                 },
                 y: {
@@ -520,22 +516,19 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
 
 
 
-    // ROI Chart removed
+    // ROI removed
 
     // Tax Savings Chart
 
     // Tax Savings Chart - Detailed Breakdown
     if (showTaxChart && taxSavingsSchedule.length > 0) {
-        const taxData = aggregateToYearlyData(taxSavingsSchedule);
+        const taxData = aggregateToCalendarYears(taxSavingsSchedule, startMonth, startYear);
 
         if (taxSavingsChart) taxSavingsChart.destroy();
         taxSavingsChart = new Chart(document.getElementById('taxSavingsChart'), {
             type: 'bar',
             data: {
-                labels: taxData.map(d => {
-                    const year = startYear + Math.floor(d.month / 12);
-                    return year.toString();
-                }),
+                labels: taxData.map(d => d.year.toString()),
                 datasets: [
                     {
                         label: 'Rental Income',

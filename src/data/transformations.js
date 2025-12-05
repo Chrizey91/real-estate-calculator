@@ -37,30 +37,43 @@ export function calculateTaxSavingsByYear(amortization, buildingValue, annualExp
     });
 
     // Calculate tax savings for each year
-    const annualRentalIncome = monthlyRent * 12;
     const schedule = [];
     Object.keys(yearlyData).sort().forEach(year => {
         const yearData = yearlyData[year];
-        const taxCalc = calculateGermanTaxSavings(buildingValue, yearData.interest, annualExpenses, taxRate, annualRentalIncome);
+        const monthsInYear = yearData.months.length;
+        const fractionOfYear = monthsInYear / 12;
+
+        // Pro-rate values for partial years
+        const actualAnnualRent = monthlyRent * monthsInYear;
+        const actualAnnualExpenses = annualExpenses * fractionOfYear;
+
+        // Calculate tax with pro-rated values
+        // Note: calculateGermanTaxSavings calculates AfA internally as 2% of building value
+        // We need to adjust the building value input to get the correct pro-rated AfA
+        // Or better, we calculate AfA manually here to be precise
+
+        const annualDepreciation = (buildingValue * 0.02) * fractionOfYear;
+        const totalDeductible = annualDepreciation + yearData.interest + actualAnnualExpenses;
+        const netRentalResult = actualAnnualRent - totalDeductible;
+        const taxSavings = netRentalResult < 0 ? Math.abs(netRentalResult) * (taxRate / 100) : 0;
 
         // Calculate components for visualization
-        const netRentalResult = taxCalc.netRentalResult;
         const isProfit = netRentalResult > 0;
         const taxableIncome = isProfit ? netRentalResult : 0;
         const deductibleOverflow = isProfit ? 0 : Math.abs(netRentalResult);
-        const taxReturns = taxCalc.taxSavings;
+        const taxReturns = taxSavings;
 
         // Add entry for each month in this year
         yearData.months.forEach(monthIdx => {
             schedule.push({
                 month: monthIdx,
-                savings: taxCalc.taxSavings,
-                totalDeductible: taxCalc.totalDeductible,
+                savings: taxSavings,
+                totalDeductible: totalDeductible,
                 // Detailed breakdown
-                annualRentalIncome: taxCalc.annualRentalIncome,
-                annualDepreciation: taxCalc.annualDepreciation,
-                annualInterest: taxCalc.annualInterest,
-                annualExpenses: taxCalc.annualExpenses,
+                annualRentalIncome: actualAnnualRent,
+                annualDepreciation: annualDepreciation,
+                annualInterest: yearData.interest,
+                annualExpenses: actualAnnualExpenses,
                 netRentalResult: netRentalResult,
                 taxableIncome: taxableIncome,
                 deductibleOverflow: deductibleOverflow,
@@ -73,13 +86,70 @@ export function calculateTaxSavingsByYear(amortization, buildingValue, annualExp
 }
 
 /**
- * Aggregates monthly data to yearly data points.
+ * Aggregates monthly data to calendar year data points.
  * @param {Array<Object>} monthlyData - Array of monthly data objects.
- * @param {number} interval - Interval in months (default 12).
- * @returns {Array<Object>} Filtered array containing only data points at the specified interval.
+ * @param {number} startMonth - Start month index (0-11).
+ * @param {number} startYear - Start year.
+ * @returns {Array<Object>} Array of yearly aggregated data.
  */
-export function aggregateToYearlyData(monthlyData, interval = 12) {
-    return monthlyData.filter((_, i) => i % interval === 0);
+export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
+    const yearlyData = {};
+
+    monthlyData.forEach(monthData => {
+        const date = new Date(startYear, startMonth, 1);
+        date.setMonth(date.getMonth() + monthData.month);
+        const year = date.getFullYear();
+
+        if (!yearlyData[year]) {
+            yearlyData[year] = {
+                year: year,
+                months: [],
+                // Flow variables (sums)
+                annualRentIncome: 0,
+                annualMortgagePayment: 0,
+                annualTaxOnRent: 0,
+                annualTaxReimbursement: 0,
+                annualNetCashFlow: 0,
+                annualInterestPayment: 0,
+                annualPrincipalPayment: 0,
+                // State variables (last value)
+                balance: 0,
+                totalInterest: 0,
+                cumulative: 0
+            };
+        }
+
+        const yearEntry = yearlyData[year];
+        yearEntry.months.push(monthData);
+
+        // Accumulate flows (check if property exists)
+        if (monthData.rentIncome !== undefined) yearEntry.annualRentIncome += monthData.rentIncome;
+        if (monthData.mortgagePayment !== undefined) yearEntry.annualMortgagePayment += monthData.mortgagePayment;
+        if (monthData.taxOnRent !== undefined) yearEntry.annualTaxOnRent += monthData.taxOnRent;
+        if (monthData.taxReimbursement !== undefined) yearEntry.annualTaxReimbursement += monthData.taxReimbursement;
+        if (monthData.netCashFlow !== undefined) yearEntry.annualNetCashFlow += monthData.netCashFlow;
+        if (monthData.interestPayment !== undefined) yearEntry.annualInterestPayment += monthData.interestPayment;
+        if (monthData.principalPayment !== undefined) yearEntry.annualPrincipalPayment += monthData.principalPayment;
+
+        // Handle Tax Savings Data (which is already annualized per month, so we take the last month's value)
+        // Note: calculateTaxSavingsByYear returns monthly entries where each entry contains the ANNUAL value for that year.
+        // So we don't sum them, we just take the last one.
+        if (monthData.annualRentalIncome !== undefined) yearEntry.annualRentalIncome = monthData.annualRentalIncome;
+        if (monthData.annualDepreciation !== undefined) yearEntry.annualDepreciation = monthData.annualDepreciation;
+        if (monthData.annualInterest !== undefined) yearEntry.annualInterest = monthData.annualInterest;
+        if (monthData.annualExpenses !== undefined) yearEntry.annualExpenses = monthData.annualExpenses;
+        if (monthData.taxableIncome !== undefined) yearEntry.taxableIncome = monthData.taxableIncome;
+        if (monthData.deductibleOverflow !== undefined) yearEntry.deductibleOverflow = monthData.deductibleOverflow;
+        if (monthData.taxReturns !== undefined) yearEntry.taxReturns = monthData.taxReturns;
+        if (monthData.totalDeductible !== undefined) yearEntry.totalDeductible = monthData.totalDeductible;
+
+        // Update state (always take latest)
+        if (monthData.balance !== undefined) yearEntry.balance = monthData.balance;
+        if (monthData.totalInterest !== undefined) yearEntry.totalInterest = monthData.totalInterest;
+        if (monthData.cumulative !== undefined) yearEntry.cumulative = monthData.cumulative;
+    });
+
+    return Object.values(yearlyData).sort((a, b) => a.year - b.year);
 }
 
 /**
@@ -142,6 +212,8 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
     // Build monthly cash flow schedule - extended to 40 years (480 months)
     const MAX_MONTHS = 480;
     const monthlyCashFlowSchedule = [];
+    const cashFlowSchedule = [];
+    let cumulativeCashFlow = -equity;
 
     for (let month = 0; month <= MAX_MONTHS; month++) {
         // Basic calculations
@@ -162,6 +234,8 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
         const netMonthlyCashFlow = rentIncome - mortgagePayment - taxOnRent;
         const monthsInThisYear = getMonthsInYearFn(month, startMonth, startYear);
 
+        cumulativeCashFlow += netMonthlyCashFlow;
+
         monthlyCashFlowSchedule.push({
             month,
             cashFlow: netMonthlyCashFlow,
@@ -174,21 +248,17 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
             annualMortgagePayment: mortgagePayment * monthsInThisYear,
             annualTaxOnRent: taxOnRent * monthsInThisYear,
             annualTaxReimbursement: -Math.min(0, taxOnRent) * monthsInThisYear,
-            annualNetCashFlow: netMonthlyCashFlow * monthsInThisYear
+            annualNetCashFlow: netMonthlyCashFlow * monthsInThisYear,
+            cumulative: cumulativeCashFlow
+        });
+
+        cashFlowSchedule.push({
+            month,
+            cumulative: cumulativeCashFlow
         });
     }
 
-    // Calculate cumulative cash flow
-    const cashFlowSchedule = [];
-    let cumulativeCashFlow = -equity;
-
-    monthlyCashFlowSchedule.forEach(monthData => {
-        cumulativeCashFlow += monthData.cashFlow;
-        cashFlowSchedule.push({
-            month: monthData.month,
-            cumulative: cumulativeCashFlow
-        });
-    });
+    // Cumulative cash flow calculated in main loop
 
     // Find break-even point
     const breakEvenMonth = cashFlowSchedule.findIndex(item => item.cumulative >= 0);
