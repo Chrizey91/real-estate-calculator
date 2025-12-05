@@ -31,7 +31,6 @@ let calculateBtn;
 document.addEventListener('DOMContentLoaded', () => {
     // Get all input elements
     inputs = {
-        propertyWorth: document.getElementById('propertyWorth'),
         purchasePrice: document.getElementById('purchasePrice'),
         additionalCosts: document.getElementById('additionalCosts'),
         expectedRent: document.getElementById('expectedRent'),
@@ -50,11 +49,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Get result elements
     results = {
+        monthlyRentResult: document.getElementById('monthlyRentResult'),
+        monthlyPaymentResult: document.getElementById('monthlyPaymentResult'),
         totalInvestment: document.getElementById('totalInvestment'),
         payoffTime: document.getElementById('payoffTime'),
         totalInterest: document.getElementById('totalInterest'),
         breakEven: document.getElementById('breakEven')
     };
+
+    // Tab Logic
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Deactivate all
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            // Activate clicked
+            btn.classList.add('active');
+            const tabId = btn.getAttribute('data-tab');
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+
+            // Trigger calculation
+            performCalculations();
+        });
+    });
 
     // Calculate button
     calculateBtn = document.getElementById('calculateBtn');
@@ -62,11 +81,9 @@ document.addEventListener('DOMContentLoaded', () => {
         calculateBtn.addEventListener('click', performCalculations);
     }
 
-    // Optimize button
-    const optimizeBtn = document.getElementById('optimizeBtn');
-    if (optimizeBtn) {
-        optimizeBtn.addEventListener('click', handleOptimization);
-    }
+    // Optimize button removed in favor of auto-calculation based on active tab
+    // We kept the Calculate button for manual trigger if needed
+
 
     // Add event listeners to inputs for real-time updates
     Object.values(inputs).forEach(input => {
@@ -130,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function getInputValues() {
     return {
-        propertyWorth: parseFloat(inputs.propertyWorth.value) || 0,
+        propertyWorth: parseFloat(inputs.purchasePrice.value) || 0, // removed propertyWorth input, use purchasePrice
         purchasePrice: parseFloat(inputs.purchasePrice.value) || 0,
         additionalCosts: parseFloat(inputs.additionalCosts.value) || 0,
         expectedRent: parseFloat(inputs.expectedRent.value) || 0,
@@ -144,7 +161,9 @@ function getInputValues() {
         startMonth: parseInt(inputs.startMonth.value),
         startYear: parseInt(inputs.startYear.value),
         targetCashFlow: parseFloat(inputs.targetCashFlow?.value) || 0,
-        targetRepayment: parseFloat(inputs.targetRepayment?.value) || 2.0
+        targetRepayment: parseFloat(inputs.targetRepayment?.value) || 2.0,
+        // Helper to check active tab
+        isOptimizationMode: document.querySelector('.tab-btn[data-tab="optimization"]')?.classList.contains('active')
     };
 }
 
@@ -165,20 +184,18 @@ function handleOptimization() {
         params.targetCashFlow,
         params.targetRepayment
     );
-
-    // Update inputs
-    inputs.monthlyPayment.value = optimal.monthlyPayment;
-    inputs.expectedRent.value = optimal.minRent;
-
-    // Trigger calculation to update UI
-    performCalculations();
+    return optimal;
 }
+
+
 
 /**
  * Updates the results section of the UI.
  * @param {Object} metrics - Calculated investment metrics
  */
 function updateResultsUI(metrics) {
+    results.monthlyRentResult.textContent = formatCurrency(metrics.usedRent);
+    results.monthlyPaymentResult.textContent = formatCurrency(metrics.usedMonthlyPayment);
     results.totalInvestment.textContent = formatCurrency(metrics.totalInvestment);
 
     // Payoff Time Display with year
@@ -231,6 +248,13 @@ function hideTaxUI() {
 function performCalculations() {
     const params = getInputValues();
 
+    // Check for Optimization Mode
+    if (params.isOptimizationMode) {
+        const optimal = handleOptimization(); // Get optimal values based on inputs
+        params.monthlyPayment = optimal.monthlyPayment;
+        params.expectedRent = optimal.minRent;
+    }
+
     // Calculate amortization schedule
     const amortization = calculateAmortization(params.debtAmount, params.monthlyPayment, params.interestRate);
 
@@ -252,6 +276,10 @@ function performCalculations() {
 
     // Calculate comprehensive metrics
     const metrics = calculateInvestmentMetrics(params, amortization, getMonthsInYear);
+
+    // Add used rent and payment to metrics for display
+    metrics.usedRent = params.expectedRent;
+    metrics.usedMonthlyPayment = params.monthlyPayment;
 
     // Update results UI
     updateResultsUI(metrics);
