@@ -16,7 +16,7 @@ import {
 
 
 import {
-    aggregateToYearlyData,
+    aggregateToCalendarYears,
     extendAmortizationSchedule,
     calculateInvestmentMetrics
 } from '../../src/data/transformations.js';
@@ -527,12 +527,14 @@ printSection('🔄 Test Suite 7: Data Transformations');
 
 {
     // Test 1: Aggregate to yearly data
+    // Create 24 months of data starting from Jan 2025 (Month 0)
+    // 0-11 = 2025, 12-23 = 2026
     const monthlyData = Array.from({ length: 24 }, (_, i) => ({ month: i, value: i }));
-    const yearlyData = aggregateToYearlyData(monthlyData);
+    const yearlyData = aggregateToCalendarYears(monthlyData, 0, 2025);
 
     assertApproximatelyEqual(yearlyData.length, 2, 'Should have 2 yearly data points for 24 months');
-    assertApproximatelyEqual(yearlyData[0].month, 0, 'First point should be month 0');
-    assertApproximatelyEqual(yearlyData[1].month, 12, 'Second point should be month 12');
+    assertApproximatelyEqual(yearlyData[0].year, 2025, 'First point should be year 2025');
+    assertApproximatelyEqual(yearlyData[1].year, 2026, 'Second point should be year 2026');
 }
 
 {
