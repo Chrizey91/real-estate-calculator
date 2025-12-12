@@ -17,6 +17,12 @@ import {
     calculateInvestmentMetrics
 } from '../data/transformations.js';
 
+import {
+    serializeState,
+    deserializeState,
+    applyStateToInputs
+} from '../utils/url_state.js';
+
 import { calculateOptimalScenario } from '../core/optimization.js';
 
 // Chart instances
@@ -26,9 +32,13 @@ let debtChart, cashFlowChart, taxSavingsChart, monthlyCashFlowChart;
 let inputs = {};
 let results = {};
 let calculateBtn;
+let shareBtn;
 
 // Initialize DOM elements and listeners
 document.addEventListener('DOMContentLoaded', () => {
+    // Check for URL State Params first
+    const urlState = deserializeState(window.location.search);
+
     // Get all input elements
     inputs = {
         purchasePrice: document.getElementById('purchasePrice'),
@@ -75,10 +85,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Calculate button
+    // Get calculate button
     calculateBtn = document.getElementById('calculateBtn');
+    shareBtn = document.getElementById('shareBtn');
+
     if (calculateBtn) {
         calculateBtn.addEventListener('click', performCalculations);
+    }
+
+    if (shareBtn) {
+        shareBtn.addEventListener('click', handleShare);
+    }
+
+    // If URL state exists, apply it to inputs BEFORE adding listeners (to avoid accidental triggers)
+    // Actually, applying it triggers events if we use dispatchEvent inside applyStateToInputs.
+    // If we rely on performCalculations() at the end, we are good.
+    if (urlState) {
+        applyStateToInputs(urlState, inputs);
+
+        // Handle Tab Selection based on params? 
+        // Currently we don't sync tab state in url_state.js, but inputs are synced.
+        // If optimization inputs are set, user might want to see optimization tab.
+        // For simplicity, we stay on Manual or default unless logic changes.
     }
 
     // Optimize button removed in favor of auto-calculation based on active tab
@@ -243,6 +271,36 @@ function updateTaxUI(taxCalc, taxRate) {
 function hideTaxUI() {
     // Hide tax chart
     document.getElementById('taxSavingsChartContainer').style.display = 'none';
+}
+
+/**
+ * Handles the Share button click.
+ * Serializes state, updates URL clipboard, and shows feedback.
+ */
+function handleShare() {
+    const params = serializeState(inputs);
+    const url = `${window.location.origin}${window.location.pathname}?${params}`;
+
+    navigator.clipboard.writeText(url).then(() => {
+        const originalText = shareBtn.innerHTML;
+        shareBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Copied!
+        `;
+        shareBtn.style.color = 'var(--success)';
+        shareBtn.style.borderColor = 'var(--success)';
+
+        setTimeout(() => {
+            shareBtn.innerHTML = originalText;
+            shareBtn.style.color = '';
+            shareBtn.style.borderColor = '';
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy URL:', err);
+        alert('Failed to copy URL to clipboard');
+    });
 }
 
 function performCalculations() {
