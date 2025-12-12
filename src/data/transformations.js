@@ -90,10 +90,19 @@ export function calculateTaxSavingsByYear(amortization, buildingValue, annualExp
  * @param {Array<Object>} monthlyData - Array of monthly data objects.
  * @param {number} startMonth - Start month index (0-11).
  * @param {number} startYear - Start year.
+ * @param {Object} initialValues - Initial state values for Beginning-of-Year snapshots.
  * @returns {Array<Object>} Array of yearly aggregated data.
  */
-export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
+export function aggregateToCalendarYears(monthlyData, startMonth, startYear, initialValues = {}) {
     const yearlyData = {};
+
+    // Track running state for robust start-value determination
+    let lastState = {
+        balance: initialValues.balance || 0,
+        cumulative: initialValues.cumulative || 0,
+        cumulativeIlliquid: initialValues.cumulativeIlliquid || 0,
+        totalCumulative: initialValues.totalCumulative || 0
+    };
 
     monthlyData.forEach(monthData => {
         const date = new Date(startYear, startMonth, 1);
@@ -101,6 +110,29 @@ export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
         const year = date.getFullYear();
 
         if (!yearlyData[year]) {
+            // Determine "Start of Year" values
+            // If this is the first year (check if month index matches start), use initialValues.
+            // But monthlyData is 0, 1, 2...
+            // So if monthData.month == 0 -> Initial.
+            // If new year starts at month index X, then StartValue = monthlyData[X-1].State.
+
+            let balanceStart, cumulativeStart, cumulativeIlliquidStart, totalCumulativeStart;
+
+            if (monthData.month === 0) {
+                // Very start of the simulation
+                balanceStart = initialValues.balance !== undefined ? initialValues.balance : 0;
+                cumulativeStart = initialValues.cumulative !== undefined ? initialValues.cumulative : 0;
+                cumulativeIlliquidStart = initialValues.cumulativeIlliquid !== undefined ? initialValues.cumulativeIlliquid : 0;
+                totalCumulativeStart = initialValues.totalCumulative !== undefined ? initialValues.totalCumulative : 0;
+            } else {
+                // Continuation from previous state (robust against gaps or index mismatches)
+                // If this is the FIRST month of the year, use the running last state.
+                balanceStart = lastState.balance;
+                cumulativeStart = lastState.cumulative;
+                cumulativeIlliquidStart = lastState.cumulativeIlliquid;
+                totalCumulativeStart = lastState.totalCumulative;
+            }
+
             yearlyData[year] = {
                 year: year,
                 months: [],
@@ -112,12 +144,17 @@ export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
                 annualNetCashFlow: 0,
                 annualInterestPayment: 0,
                 annualPrincipalPayment: 0,
-                // State variables (last value)
+                // State variables (last value of year - End of Year)
                 balance: 0,
                 totalInterest: 0,
                 cumulative: 0,
                 cumulativeIlliquid: 0,
-                totalCumulative: 0
+                totalCumulative: 0,
+                // Start variables (Beginning of Year)
+                balanceStart: balanceStart,
+                cumulativeStart: cumulativeStart,
+                cumulativeIlliquidStart: cumulativeIlliquidStart,
+                totalCumulativeStart: totalCumulativeStart
             };
         }
 
@@ -133,9 +170,7 @@ export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
         if (monthData.interestPayment !== undefined) yearEntry.annualInterestPayment += monthData.interestPayment;
         if (monthData.principalPayment !== undefined) yearEntry.annualPrincipalPayment += monthData.principalPayment;
 
-        // Handle Tax Savings Data (which is already annualized per month, so we take the last month's value)
-        // Note: calculateTaxSavingsByYear returns monthly entries where each entry contains the ANNUAL value for that year.
-        // So we don't sum them, we just take the last one.
+        // Handle Tax Savings Data
         if (monthData.annualRentalIncome !== undefined) yearEntry.annualRentalIncome = monthData.annualRentalIncome;
         if (monthData.annualDepreciation !== undefined) yearEntry.annualDepreciation = monthData.annualDepreciation;
         if (monthData.annualInterest !== undefined) yearEntry.annualInterest = monthData.annualInterest;
@@ -145,12 +180,18 @@ export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
         if (monthData.taxReturns !== undefined) yearEntry.taxReturns = monthData.taxReturns;
         if (monthData.totalDeductible !== undefined) yearEntry.totalDeductible = monthData.totalDeductible;
 
-        // Update state (always take latest)
+        // Update state (always take latest - End of Year)
         if (monthData.balance !== undefined) yearEntry.balance = monthData.balance;
         if (monthData.totalInterest !== undefined) yearEntry.totalInterest = monthData.totalInterest;
         if (monthData.cumulative !== undefined) yearEntry.cumulative = monthData.cumulative;
         if (monthData.cumulativeIlliquid !== undefined) yearEntry.cumulativeIlliquid = monthData.cumulativeIlliquid;
         if (monthData.totalCumulative !== undefined) yearEntry.totalCumulative = monthData.totalCumulative;
+
+        // Update running state for next iteration
+        if (monthData.balance !== undefined) lastState.balance = monthData.balance;
+        if (monthData.cumulative !== undefined) lastState.cumulative = monthData.cumulative;
+        if (monthData.cumulativeIlliquid !== undefined) lastState.cumulativeIlliquid = monthData.cumulativeIlliquid;
+        if (monthData.totalCumulative !== undefined) lastState.totalCumulative = monthData.totalCumulative;
     });
 
     return Object.values(yearlyData).sort((a, b) => a.year - b.year);
@@ -167,7 +208,13 @@ export function extendAmortizationSchedule(amortization, targetMonths = 480) {
     const finalTotalInterest = amortization.length > 0 ? amortization[amortization.length - 1].totalInterest : 0;
 
     // Pad with zero balance months up to targetMonths
-    for (let month = amortization.length; month <= targetMonths; month++) {
+    // Fix: Robustly determine next month number
+    let nextMonthNum = 0;
+    if (amortization.length > 0) {
+        nextMonthNum = amortization[amortization.length - 1].month + 1;
+    }
+
+    for (let month = nextMonthNum; month <= targetMonths; month++) {
         extended.push({
             month: month,
             balance: 0,
@@ -222,15 +269,33 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
     for (let month = 0; month <= MAX_MONTHS; month++) {
         // Basic calculations
         const rentIncome = expectedRent;
-        const mortgagePayment = month < payoffMonths ? monthlyPayment : 0;
+        // Use actual payment from amortization schedule if available (handle partial final payments)
+        let mortgagePayment = 0;
+        let interestPayment = 0;
+        let principalPayment = 0;
+        let currentBalance = 0;
+
+        if (month > 0 && (month - 1) < amortization.length) {
+            const entry = amortization[month - 1];
+            mortgagePayment = entry.payment;
+            interestPayment = entry.interestPayment;
+            principalPayment = entry.principalPayment;
+            currentBalance = entry.balance;
+        } else if (month === 0) {
+            // Month 0 (Start): No payments yet. Balance is Debt Amount.
+            // We can pass initial debt in params but here we just need payment flows which are 0.
+            // currentBalance logic in loop is tricky if we depend on it for equity calculation.
+            // If amortization[0] is month 1 balance.
+            // Month 0 balance should be Debt Amount.
+            currentBalance = debtAmount;
+        }
 
         // Tax on rental profit/loss
         let taxOnRent = 0;
         if (applyGermanTax) {
-            const monthlyInterest = month < amortization.length ? amortization[month].interestPayment : 0;
             const monthlyAfA = (buildingValue * 0.02) / 12;
             const monthlyExpenses = annualExpenses / 12;
-            const monthlyDeductibles = monthlyAfA + monthlyInterest + monthlyExpenses;
+            const monthlyDeductibles = monthlyAfA + interestPayment + monthlyExpenses;
             const monthlyNetRental = expectedRent - monthlyDeductibles;
             taxOnRent = monthlyNetRental * (taxRate / 100);
         }
@@ -243,13 +308,37 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
         // Calculate Equity (Illiquid Cash Flow)
         // Equity = Initial Property Equity (Purchase Price - Debt) + Principal Paid
         // This excludes additional costs (sunk costs) from the asset value view
-        const currentBalance = month < amortization.length ? amortization[month].balance : 0;
-        const principalPaid = debtAmount - currentBalance;
         const initialPropertyEquity = purchasePrice - debtAmount;
-        const cumulativeIlliquid = initialPropertyEquity + principalPaid;
+        // Optimization: principalPaid variable above is monthly; we need cumulative.
+        // Or simply: Debt - CurrentBalance.
+        const principalPaidCumulative = debtAmount - currentBalance;
+        const cumulativeIlliquid = initialPropertyEquity + principalPaidCumulative;
 
         // Calculate Total Cumulative (Liquid + Illiquid)
         const totalCumulative = cumulativeCashFlow + cumulativeIlliquid;
+
+        monthlyCashFlowSchedule.push({
+            month,
+            cashFlow: netMonthlyCashFlow,
+            rentIncome,
+            mortgagePayment,
+            taxOnRent,
+            taxReimbursement: -Math.min(0, taxOnRent),
+            netCashFlow: netMonthlyCashFlow,
+            annualRentIncome: rentIncome * monthsInThisYear,
+            annualMortgagePayment: mortgagePayment * monthsInThisYear,
+            annualTaxOnRent: taxOnRent * monthsInThisYear,
+            annualTaxReimbursement: -Math.min(0, taxOnRent) * monthsInThisYear,
+            annualNetCashFlow: netMonthlyCashFlow * monthsInThisYear,
+            cumulative: cumulativeCashFlow,
+            cumulativeIlliquid: cumulativeIlliquid,
+            totalCumulative: totalCumulative,
+            // Pass through state for aggregation
+            balance: currentBalance,
+            totalInterest: amortization[month]?.totalInterest || totalInterest,
+            principalPayment: principalPayment,
+            interestPayment: interestPayment
+        });
 
         monthlyCashFlowSchedule.push({
             month,

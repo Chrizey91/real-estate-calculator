@@ -284,11 +284,30 @@ function performCalculations() {
     // Update results UI
     updateResultsUI(metrics);
 
-    // Extend amortization to 40 years for consistent chart duration
-    const extendedAmortization = extendAmortizationSchedule(amortization, 480);
+    // Centralize Month 0 Logic: Prepend Start Snapshot (Month 0) to amortization
+    // This ensures all downstream consumers (Tax Calc, Charts, Aggregation) see the Start Year.
+    // Especially important if Purchase Date is late (e.g. Dec), Month 0 captures that year.
+
+    // Check if Month 0 exists (it shouldn't from calculateAmortization which starts at Month 1)
+    // Create a copy to avoid mutation issues if calculateAmortization result is reused (though it's fresh here)
+    const fullAmortization = [...amortization];
+
+    if (fullAmortization.length === 0 || fullAmortization[0].month !== 0) {
+        fullAmortization.unshift({
+            month: 0,
+            balance: params.debtAmount,
+            interestPayment: 0,
+            principalPayment: 0,
+            payment: 0,
+            totalInterest: 0
+        });
+    }
+
+    // Extend amortization to 40 years for consistent chart duration using FULL schedule
+    const extendedAmortization = extendAmortizationSchedule(fullAmortization, 480);
 
     // Calculate tax savings by calendar year (if applicable)
-    // Use extended amortization to ensure tax chart covers the same 40-year period as other charts
+    // Now uses extendedAmortization which INCLUDES Month 0.
     const taxSavingsSchedule = params.applyGermanTax
         ? calculateTaxSavingsByYear(
             extendedAmortization,
@@ -302,7 +321,7 @@ function performCalculations() {
         : [];
 
     updateCharts(
-        amortization,
+        fullAmortization,
         metrics.cashFlowSchedule,
         null, // ROI schedule removed
         taxSavingsSchedule,
@@ -314,11 +333,41 @@ function performCalculations() {
 }
 
 function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSchedule, showTaxChart, startMonth, startYear, monthlyCashFlowSchedule) {
-    // Extend amortization to 40 years if shorter
+    // Amortization passed here is now 'amortization' (original) but we want 'extendedAmortization' or 'fullAmortization'.
+    // Actually, updateCharts receives 'amortization' as arg1.
+    // In performCalculations, we call updateCharts(amortization, ...).
+    // We SHOULD pass 'fullAmortization' or 'extendedAmortization' to updateCharts to avoid re-extending and re-prepending.
+    // Let's assume we will update the call site in performCalculations to pass 'fullAmortization' (or just let updateCharts extend it).
+    // Standardizing: performCalculations passes 'fullAmortization'.
+    // updateCharts extends it.
+
     const extendedAmortization = extendAmortizationSchedule(amortization, 480);
 
+    const inputs = getInputValues();
+    const initialDebt = inputs.debtAmount;
+
+    // Month 0 check removed (Centralized in performCalculations)
+    // We trust 'amortization' argument has Month 0 if passed from performCalculations.
+    // Only need to ensure extendAmortizationSchedule preserves it (it does).
+    const initialEquity = inputs.purchasePrice - inputs.debtAmount;
+    // Initial cumulative liquid is strictly -Equity (Downpayment) + Additional Costs?
+    // Wait, calculation starts at cumulativeCashFlow = -equity.
+    // Does it include additional costs?
+    // In calculateInvestmentMetrics: `cumulativeCashFlow = -equity`.
+    // And `equity = totalInvestment - debtAmount` where `totalInvestment = purchasePrice + additionalCosts`.
+    // So `equity` variable there DOES include additional costs.
+    // BUT checking my previous fix: I calculated `cumulativeIlliquid` using `initialPropertyEquity = purchasePrice - debtAmount`.
+    // So for liquid cash flow, it starts at `- (Purchase + Costs - Debt)`. This is correct.
+
+    const initialValues = {
+        balance: initialDebt,
+        cumulative: -(inputs.purchasePrice + inputs.additionalCosts - inputs.debtAmount),
+        cumulativeIlliquid: initialEquity, // Pure property equity
+        totalCumulative: -(inputs.purchasePrice + inputs.additionalCosts - inputs.debtAmount) + initialEquity
+    };
+
     // Debt Chart - Calendar Year Aggregation
-    const debtData = aggregateToCalendarYears(extendedAmortization, startMonth, startYear);
+    const debtData = aggregateToCalendarYears(extendedAmortization, startMonth, startYear, initialValues);
 
     if (debtChart) debtChart.destroy();
     debtChart = new Chart(document.getElementById('debtChart'), {
@@ -328,7 +377,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
             datasets: [
                 {
                     label: 'Remaining Debt',
-                    data: debtData.map(d => d.balance),
+                    data: debtData.map(d => d.balanceStart),
                     borderColor: '#ef4444',
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     fill: true,
@@ -337,7 +386,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 },
                 {
                     label: 'Cumulative Interest Paid',
-                    data: debtData.map(d => d.totalInterest),
+                    data: debtData.map((d, i) => i === 0 ? 0 : debtData[i - 1].totalInterest),
                     borderColor: '#f59e0b',
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     fill: false,
@@ -346,9 +395,13 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 },
                 {
                     label: 'Cumulative Principal Paid',
-                    data: debtData.map((d) => {
-                        const originalDebt = amortization.length > 0 ? amortization[0].balance + amortization[0].principalPayment : 0;
-                        return originalDebt - d.balance;
+                    // Start of Year Principal Paid.
+                    // 2024 Start: 0.
+                    // 2025 Start: Principal paid in 2024.
+                    data: debtData.map((d, i) => {
+                        const inputs = getInputValues();
+                        const initialDebt = inputs.debtAmount;
+                        return initialDebt - d.balanceStart;
                     }),
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -398,12 +451,22 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
     });
 
     // Detailed Cash Flow Chart - Calendar Year Aggregation
-    const monthlyData = aggregateToCalendarYears(monthlyCashFlowSchedule, startMonth, startYear);
+    // Pass same initialValues (declared above)
+
+    const monthlyData = aggregateToCalendarYears(monthlyCashFlowSchedule, startMonth, startYear, initialValues);
 
     if (monthlyCashFlowChart) monthlyCashFlowChart.destroy();
     monthlyCashFlowChart = new Chart(document.getElementById('monthlyCashFlowChart'), {
         type: 'line',
         data: {
+            // ... (Monthly Chart uses Annual Sums - flows during the year - keep as is?)
+            // "shows numbers at beginning of said year" logic mostly applies to snapshots (Cumulative/Stock).
+            // For Flow charts (Annual Rent/Tax), "Beginning of 2024" = 0 flow?
+            // "Annual Rent during 2024".
+            // If we shift snapshot graphs to "Begin", "2024" on Balance Graph = Jan 1.
+            // "2024" on Flow Graph = Jan 1 to Dec 31 flow.
+            // This is the standard "Period" vs "Instant" chart alignment.
+            // So we KEEP flow variables as `d.annual...`.
             labels: monthlyData.map(d => d.year.toString()),
             datasets: [
                 {
@@ -448,44 +511,8 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                     borderWidth: 3
                 }
             ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        color: '#94a3b8',
-                        usePointStyle: true,
-                        padding: 15
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => context.dataset.label + ': ' + formatCurrency(context.parsed.y)
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Year'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Annual Amount (€)'
-                    },
-                    ticks: {
-                        callback: (value) => formatCurrency(value)
-                    }
-                }
-            }
         }
+        // ...
     });
 
     // Cumulative Cash Flow Chart - Uses same aggregated data
@@ -497,7 +524,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
             datasets: [
                 {
                     label: 'Cumulative Liquid Cash Flow',
-                    data: monthlyData.map(d => d.cumulative),
+                    data: monthlyData.map(d => d.cumulativeStart), // Use Start
                     borderColor: '#3b82f6', // Blue-500
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     fill: false,
@@ -505,7 +532,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 },
                 {
                     label: 'Cumulative Illiquid Cash Flow (Equity)',
-                    data: monthlyData.map(d => d.cumulativeIlliquid),
+                    data: monthlyData.map(d => d.cumulativeIlliquidStart), // Use Start
                     borderColor: '#0ea5e9', // Sky-500
                     backgroundColor: 'rgba(14, 165, 233, 0.1)',
                     fill: false,
@@ -513,7 +540,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 },
                 {
                     label: 'Total Cumulative Cash Flow',
-                    data: monthlyData.map(d => d.totalCumulative),
+                    data: monthlyData.map(d => d.totalCumulativeStart), // Use Start
                     borderColor: '#8b5cf6', // Violet-500
                     backgroundColor: 'rgba(139, 92, 246, 0.1)',
                     fill: true,
