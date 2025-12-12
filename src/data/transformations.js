@@ -345,8 +345,8 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
 
     // Cumulative cash flow calculated in main loop
 
-    // Find break-even point
-    const breakEvenMonth = cashFlowSchedule.findIndex(item => item.cumulative >= 0);
+    // Find break-even point (Total Cumulative Cash Flow >= 0)
+    const breakEvenMonth = cashFlowSchedule.findIndex(item => item.totalCumulative >= 0);
     const breakEvenYears = breakEvenMonth >= 0 ? breakEvenMonth / 12 : 0;
 
     // Calculate max investment needed (lowest point of cumulative cash flow)
