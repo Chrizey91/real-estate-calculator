@@ -246,98 +246,74 @@ function hideTaxUI() {
 }
 
 function performCalculations() {
-    try {
-        const params = getInputValues();
+    const params = getInputValues();
 
-        // Check for Optimization Mode
-        if (params.isOptimizationMode) {
-            const optimal = handleOptimization(); // Get optimal values based on inputs
-            params.monthlyPayment = optimal.monthlyPayment;
-            params.expectedRent = optimal.minRent;
-        }
+    // Check for Optimization Mode
+    if (params.isOptimizationMode) {
+        const optimal = handleOptimization(); // Get optimal values based on inputs
+        params.monthlyPayment = optimal.monthlyPayment;
+        params.expectedRent = optimal.minRent;
+    }
 
-        // Calculate amortization schedule
-        const amortization = calculateAmortization(params.debtAmount, params.monthlyPayment, params.interestRate);
+    // Calculate amortization schedule
+    const amortization = calculateAmortization(params.debtAmount, params.monthlyPayment, params.interestRate);
 
-        // Shift amortization (1-based -> 0-based) for downstream consistency (Month 0 Active Logic)
-        const shiftedAmortization = amortization.map(entry => ({
-            ...entry,
-            month: entry.month - 1
-        }));
+    // Shift amortization (1-based -> 0-based) for downstream consistency (Month 0 Active Logic)
+    const shiftedAmortization = amortization.map(entry => ({
+        ...entry,
+        month: entry.month - 1
+    }));
 
-        // German tax calculations (Year 1 snapshot)
-        if (params.applyGermanTax) {
-            const annualRentalIncome = params.expectedRent * 12;
-            const firstYearInterest = amortization.slice(0, 12).reduce((sum, month) => sum + month.interestPayment, 0);
-            const taxCalc = calculateGermanTaxSavings(
-                params.buildingValue,
-                firstYearInterest,
-                params.annualExpenses,
-                params.taxRate,
-                annualRentalIncome
-            );
-            updateTaxUI(taxCalc, params.taxRate);
-        } else {
-            hideTaxUI();
-        }
+    // German tax calculations (Year 1 snapshot)
+    if (params.applyGermanTax) {
+        const annualRentalIncome = params.expectedRent * 12;
+        const firstYearInterest = amortization.slice(0, 12).reduce((sum, month) => sum + month.interestPayment, 0);
+        const taxCalc = calculateGermanTaxSavings(
+            params.buildingValue,
+            firstYearInterest,
+            params.annualExpenses,
+            params.taxRate,
+            annualRentalIncome
+        );
+        updateTaxUI(taxCalc, params.taxRate);
+    } else {
+        hideTaxUI();
+    }
 
-        // Calculate comprehensive metrics (Using SHIFTED amortization)
-        const metrics = calculateInvestmentMetrics(params, shiftedAmortization, getMonthsInYear);
+    // Calculate comprehensive metrics (Using SHIFTED amortization)
+    const metrics = calculateInvestmentMetrics(params, shiftedAmortization, getMonthsInYear);
 
-        // Add used rent and payment to metrics for display
-        metrics.usedRent = params.expectedRent;
-        metrics.usedMonthlyPayment = params.monthlyPayment;
-        updateResultsUI(metrics);
+    // Add used rent and payment to metrics for display
+    metrics.usedRent = params.expectedRent;
+    metrics.usedMonthlyPayment = params.monthlyPayment;
+    updateResultsUI(metrics);
 
-        // Extend shifted schedule for charts
-        const extendedAmortization = extendAmortizationSchedule(shiftedAmortization, 480);
+    // Extend shifted schedule for charts
+    const extendedAmortization = extendAmortizationSchedule(shiftedAmortization, 480);
 
-        // Calculate tax savings by calendar year using shifted schedule
-        const taxSavingsSchedule = params.applyGermanTax
-            ? calculateTaxSavingsByYear(
-                extendedAmortization,
-                params.buildingValue,
-                params.annualExpenses,
-                params.taxRate,
-                params.startMonth,
-                params.startYear,
-                params.expectedRent
-            )
-            : [];
-
-        updateCharts(
+    // Calculate tax savings by calendar year using shifted schedule
+    const taxSavingsSchedule = params.applyGermanTax
+        ? calculateTaxSavingsByYear(
             extendedAmortization,
-            metrics.cashFlowSchedule,
-            null, // ROI schedule removed
-            taxSavingsSchedule,
-            params.applyGermanTax,
+            params.buildingValue,
+            params.annualExpenses,
+            params.taxRate,
             params.startMonth,
             params.startYear,
-            metrics.monthlyCashFlowSchedule
-        );
+            params.expectedRent
+        )
+        : [];
 
-    } catch (err) {
-        console.error("Critical Error in performCalculations:", err);
-        // Display error overlay
-        let errorEl = document.getElementById('critical-error-log');
-        if (!errorEl) {
-            errorEl = document.createElement('div');
-            errorEl.id = 'critical-error-log';
-            errorEl.style.position = 'fixed';
-            errorEl.style.top = '10px';
-            errorEl.style.left = '10px';
-            errorEl.style.right = '10px';
-            errorEl.style.padding = '20px';
-            errorEl.style.background = '#fee2e2';
-            errorEl.style.color = '#991b1b';
-            errorEl.style.border = '2px solid #ef4444';
-            errorEl.style.borderRadius = '8px';
-            errorEl.style.zIndex = '9999';
-            errorEl.style.fontFamily = 'monospace';
-            document.body.appendChild(errorEl);
-        }
-        errorEl.textContent = `CRITICAL ERROR: ${err.message}\n${err.stack}`;
-    }
+    updateCharts(
+        extendedAmortization,
+        metrics.cashFlowSchedule,
+        null, // ROI schedule removed
+        taxSavingsSchedule,
+        params.applyGermanTax,
+        params.startMonth,
+        params.startYear,
+        metrics.monthlyCashFlowSchedule
+    );
 }
 
 function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSchedule, showTaxChart, startMonth, startYear, monthlyCashFlowSchedule) {
