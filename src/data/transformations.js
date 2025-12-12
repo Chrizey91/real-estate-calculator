@@ -268,26 +268,19 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
 
     for (let month = 0; month <= MAX_MONTHS; month++) {
         // Basic calculations
-        const rentIncome = expectedRent;
+        let rentIncome = expectedRent;
         // Use actual payment from amortization schedule if available (handle partial final payments)
         let mortgagePayment = 0;
         let interestPayment = 0;
         let principalPayment = 0;
         let currentBalance = 0;
 
-        if (month > 0 && (month - 1) < amortization.length) {
-            const entry = amortization[month - 1];
+        if (month < amortization.length) {
+            const entry = amortization[month];
             mortgagePayment = entry.payment;
             interestPayment = entry.interestPayment;
             principalPayment = entry.principalPayment;
             currentBalance = entry.balance;
-        } else if (month === 0) {
-            // Month 0 (Start): No payments yet. Balance is Debt Amount.
-            // We can pass initial debt in params but here we just need payment flows which are 0.
-            // currentBalance logic in loop is tricky if we depend on it for equity calculation.
-            // If amortization[0] is month 1 balance.
-            // Month 0 balance should be Debt Amount.
-            currentBalance = debtAmount;
         }
 
         // Tax on rental profit/loss
@@ -340,23 +333,7 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
             interestPayment: interestPayment
         });
 
-        monthlyCashFlowSchedule.push({
-            month,
-            cashFlow: netMonthlyCashFlow,
-            rentIncome,
-            mortgagePayment,
-            taxOnRent,
-            taxReimbursement: -Math.min(0, taxOnRent),
-            netCashFlow: netMonthlyCashFlow,
-            annualRentIncome: rentIncome * monthsInThisYear,
-            annualMortgagePayment: mortgagePayment * monthsInThisYear,
-            annualTaxOnRent: taxOnRent * monthsInThisYear,
-            annualTaxReimbursement: -Math.min(0, taxOnRent) * monthsInThisYear,
-            annualNetCashFlow: netMonthlyCashFlow * monthsInThisYear,
-            cumulative: cumulativeCashFlow,
-            cumulativeIlliquid: cumulativeIlliquid,
-            totalCumulative: totalCumulative
-        });
+
 
         cashFlowSchedule.push({
             month,

@@ -246,90 +246,98 @@ function hideTaxUI() {
 }
 
 function performCalculations() {
-    const params = getInputValues();
+    try {
+        const params = getInputValues();
 
-    // Check for Optimization Mode
-    if (params.isOptimizationMode) {
-        const optimal = handleOptimization(); // Get optimal values based on inputs
-        params.monthlyPayment = optimal.monthlyPayment;
-        params.expectedRent = optimal.minRent;
-    }
+        // Check for Optimization Mode
+        if (params.isOptimizationMode) {
+            const optimal = handleOptimization(); // Get optimal values based on inputs
+            params.monthlyPayment = optimal.monthlyPayment;
+            params.expectedRent = optimal.minRent;
+        }
 
-    // Calculate amortization schedule
-    const amortization = calculateAmortization(params.debtAmount, params.monthlyPayment, params.interestRate);
+        // Calculate amortization schedule
+        const amortization = calculateAmortization(params.debtAmount, params.monthlyPayment, params.interestRate);
 
-    // German tax calculations (Year 1 snapshot)
-    if (params.applyGermanTax) {
-        const annualRentalIncome = params.expectedRent * 12;
-        const firstYearInterest = amortization.slice(0, 12).reduce((sum, month) => sum + month.interestPayment, 0);
-        const taxCalc = calculateGermanTaxSavings(
-            params.buildingValue,
-            firstYearInterest,
-            params.annualExpenses,
-            params.taxRate,
-            annualRentalIncome
-        );
-        updateTaxUI(taxCalc, params.taxRate);
-    } else {
-        hideTaxUI();
-    }
+        // Shift amortization (1-based -> 0-based) for downstream consistency (Month 0 Active Logic)
+        const shiftedAmortization = amortization.map(entry => ({
+            ...entry,
+            month: entry.month - 1
+        }));
 
-    // Calculate comprehensive metrics
-    const metrics = calculateInvestmentMetrics(params, amortization, getMonthsInYear);
+        // German tax calculations (Year 1 snapshot)
+        if (params.applyGermanTax) {
+            const annualRentalIncome = params.expectedRent * 12;
+            const firstYearInterest = amortization.slice(0, 12).reduce((sum, month) => sum + month.interestPayment, 0);
+            const taxCalc = calculateGermanTaxSavings(
+                params.buildingValue,
+                firstYearInterest,
+                params.annualExpenses,
+                params.taxRate,
+                annualRentalIncome
+            );
+            updateTaxUI(taxCalc, params.taxRate);
+        } else {
+            hideTaxUI();
+        }
 
-    // Add used rent and payment to metrics for display
-    metrics.usedRent = params.expectedRent;
-    metrics.usedMonthlyPayment = params.monthlyPayment;
+        // Calculate comprehensive metrics (Using SHIFTED amortization)
+        const metrics = calculateInvestmentMetrics(params, shiftedAmortization, getMonthsInYear);
 
-    // Update results UI
-    updateResultsUI(metrics);
+        // Add used rent and payment to metrics for display
+        metrics.usedRent = params.expectedRent;
+        metrics.usedMonthlyPayment = params.monthlyPayment;
+        updateResultsUI(metrics);
 
-    // Centralize Month 0 Logic: Prepend Start Snapshot (Month 0) to amortization
-    // This ensures all downstream consumers (Tax Calc, Charts, Aggregation) see the Start Year.
-    // Especially important if Purchase Date is late (e.g. Dec), Month 0 captures that year.
+        // Extend shifted schedule for charts
+        const extendedAmortization = extendAmortizationSchedule(shiftedAmortization, 480);
 
-    // Check if Month 0 exists (it shouldn't from calculateAmortization which starts at Month 1)
-    // Create a copy to avoid mutation issues if calculateAmortization result is reused (though it's fresh here)
-    const fullAmortization = [...amortization];
+        // Calculate tax savings by calendar year using shifted schedule
+        const taxSavingsSchedule = params.applyGermanTax
+            ? calculateTaxSavingsByYear(
+                extendedAmortization,
+                params.buildingValue,
+                params.annualExpenses,
+                params.taxRate,
+                params.startMonth,
+                params.startYear,
+                params.expectedRent
+            )
+            : [];
 
-    if (fullAmortization.length === 0 || fullAmortization[0].month !== 0) {
-        fullAmortization.unshift({
-            month: 0,
-            balance: params.debtAmount,
-            interestPayment: 0,
-            principalPayment: 0,
-            payment: 0,
-            totalInterest: 0
-        });
-    }
-
-    // Extend amortization to 40 years for consistent chart duration using FULL schedule
-    const extendedAmortization = extendAmortizationSchedule(fullAmortization, 480);
-
-    // Calculate tax savings by calendar year (if applicable)
-    // Now uses extendedAmortization which INCLUDES Month 0.
-    const taxSavingsSchedule = params.applyGermanTax
-        ? calculateTaxSavingsByYear(
+        updateCharts(
             extendedAmortization,
-            params.buildingValue,
-            params.annualExpenses,
-            params.taxRate,
+            metrics.cashFlowSchedule,
+            null, // ROI schedule removed
+            taxSavingsSchedule,
+            params.applyGermanTax,
             params.startMonth,
             params.startYear,
-            params.expectedRent
-        )
-        : [];
+            metrics.monthlyCashFlowSchedule
+        );
 
-    updateCharts(
-        fullAmortization,
-        metrics.cashFlowSchedule,
-        null, // ROI schedule removed
-        taxSavingsSchedule,
-        params.applyGermanTax,
-        params.startMonth,
-        params.startYear,
-        metrics.monthlyCashFlowSchedule
-    );
+    } catch (err) {
+        console.error("Critical Error in performCalculations:", err);
+        // Display error overlay
+        let errorEl = document.getElementById('critical-error-log');
+        if (!errorEl) {
+            errorEl = document.createElement('div');
+            errorEl.id = 'critical-error-log';
+            errorEl.style.position = 'fixed';
+            errorEl.style.top = '10px';
+            errorEl.style.left = '10px';
+            errorEl.style.right = '10px';
+            errorEl.style.padding = '20px';
+            errorEl.style.background = '#fee2e2';
+            errorEl.style.color = '#991b1b';
+            errorEl.style.border = '2px solid #ef4444';
+            errorEl.style.borderRadius = '8px';
+            errorEl.style.zIndex = '9999';
+            errorEl.style.fontFamily = 'monospace';
+            document.body.appendChild(errorEl);
+        }
+        errorEl.textContent = `CRITICAL ERROR: ${err.message}\n${err.stack}`;
+    }
 }
 
 function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSchedule, showTaxChart, startMonth, startYear, monthlyCashFlowSchedule) {
@@ -377,6 +385,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
             datasets: [
                 {
                     label: 'Remaining Debt',
+                    // Use Beginning-of-Year Balance (Standard for snapshots)
                     data: debtData.map(d => d.balanceStart),
                     borderColor: '#ef4444',
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -386,6 +395,7 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 },
                 {
                     label: 'Cumulative Interest Paid',
+                    // Beginning-of-Year Interest (Sum of previous years)
                     data: debtData.map((d, i) => i === 0 ? 0 : debtData[i - 1].totalInterest),
                     borderColor: '#f59e0b',
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
@@ -395,12 +405,10 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                 },
                 {
                     label: 'Cumulative Principal Paid',
-                    // Start of Year Principal Paid.
-                    // 2024 Start: 0.
-                    // 2025 Start: Principal paid in 2024.
-                    data: debtData.map((d, i) => {
-                        const inputs = getInputValues();
-                        const initialDebt = inputs.debtAmount;
+                    // Beginning-of-Year Principal Paid.
+                    // Year 1 (2025): Initial Debt - Initial Bal = 0.
+                    // Year 2 (2026): Initial Debt - Year 2 Start Bal (reflects Year 1 payments).
+                    data: debtData.map(d => {
                         return initialDebt - d.balanceStart;
                     }),
                     borderColor: '#10b981',

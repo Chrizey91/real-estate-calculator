@@ -623,7 +623,8 @@ printSection('📊 Suite 9: Comprehensive Metrics (Refactored Logic)');
     assertApproximatelyEqual(metrics.totalInvestment, 220000, 'Total investment should be correct');
     assertApproximatelyEqual(metrics.equity, 70000, 'Initial equity should be correct');
     assertArrayLength(metrics.monthlyCashFlowSchedule, 481, 'Monthly cash flow schedule should cover 40 years + month 0');
-    assertApproximatelyEqual(metrics.monthlyCashFlowSchedule[0].cashFlow, 200, 'Initial cash flow should be Rent - Payment (1000 - 800 = 200)');
+    // Month 0 is First Active Month.
+    assertApproximatelyEqual(metrics.monthlyCashFlowSchedule[0].cashFlow, 200, 'Month 0 cash flow should be Rent - Payment (1000 - 800 = 200)');
 }
 
 {

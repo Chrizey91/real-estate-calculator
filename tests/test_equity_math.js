@@ -36,20 +36,20 @@ const metrics = calculateInvestmentMetrics(params, mockAmortization, getMonthsIn
 
 // Check Month 0
 const m0 = metrics.cashFlowSchedule[0];
-console.log(`Month 0 Illiquid (Expected 10000): ${m0.cumulativeIlliquid}`);
-// Initial Property Equity = PurchasePrice (100k) - Debt (90k) = 10k.
-// (Additional Costs of 10k are excluded from this view).
-// Month 0 is Purchase Snapshot. Principal Paid = 0.
-// Illiquid = 10000 + 0 = 10000.
+console.log(`Month 0 Illiquid (Expected 10100): ${m0.cumulativeIlliquid}`);
+// Month 0 is Active. Principal Paid = 100.
+// Illiquid = 10000 + 100 = 10100.
 
 // Check Month 10
 const m10 = metrics.cashFlowSchedule[10];
-console.log(`Month 10 Illiquid (Expected 11000): ${m10.cumulativeIlliquid}`);
-// Principal Paid after 10 months = 10 * 100 = 1000.
-// Illiquid = 10000 + 1000 = 11000.
+console.log(`Month 10 Illiquid (Expected 11100): ${m10.cumulativeIlliquid}`);
+// Principal Paid after 10 months (indices 0..10) = 11 months * 100 = 1100.
+// Wait, index 10 is the 11th element.
+// amort[0]..amort[10] -> 11 payments.
+// 10000 + 1100 = 11100.
 
-if (m0.cumulativeIlliquid === 10000 && m10.cumulativeIlliquid === 11000) {
-    console.log("SUCCESS: Equity calculations are correct (Costs excluded).");
+if (m0.cumulativeIlliquid === 10100 && m10.cumulativeIlliquid === 11100) {
+    console.log("SUCCESS: Equity calculations are correct.");
 } else {
     console.error(`FAILURE: Equity calculations incorrect. Got M0=${m0.cumulativeIlliquid}, M10=${m10.cumulativeIlliquid}`);
     process.exit(1);
