@@ -115,7 +115,9 @@ export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
                 // State variables (last value)
                 balance: 0,
                 totalInterest: 0,
-                cumulative: 0
+                cumulative: 0,
+                cumulativeIlliquid: 0,
+                totalCumulative: 0
             };
         }
 
@@ -147,6 +149,8 @@ export function aggregateToCalendarYears(monthlyData, startMonth, startYear) {
         if (monthData.balance !== undefined) yearEntry.balance = monthData.balance;
         if (monthData.totalInterest !== undefined) yearEntry.totalInterest = monthData.totalInterest;
         if (monthData.cumulative !== undefined) yearEntry.cumulative = monthData.cumulative;
+        if (monthData.cumulativeIlliquid !== undefined) yearEntry.cumulativeIlliquid = monthData.cumulativeIlliquid;
+        if (monthData.totalCumulative !== undefined) yearEntry.totalCumulative = monthData.totalCumulative;
     });
 
     return Object.values(yearlyData).sort((a, b) => a.year - b.year);
@@ -236,6 +240,17 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
 
         cumulativeCashFlow += netMonthlyCashFlow;
 
+        // Calculate Equity (Illiquid Cash Flow)
+        // Equity = Initial Property Equity (Purchase Price - Debt) + Principal Paid
+        // This excludes additional costs (sunk costs) from the asset value view
+        const currentBalance = month < amortization.length ? amortization[month].balance : 0;
+        const principalPaid = debtAmount - currentBalance;
+        const initialPropertyEquity = purchasePrice - debtAmount;
+        const cumulativeIlliquid = initialPropertyEquity + principalPaid;
+
+        // Calculate Total Cumulative (Liquid + Illiquid)
+        const totalCumulative = cumulativeCashFlow + cumulativeIlliquid;
+
         monthlyCashFlowSchedule.push({
             month,
             cashFlow: netMonthlyCashFlow,
@@ -249,12 +264,16 @@ export function calculateInvestmentMetrics(params, amortization, getMonthsInYear
             annualTaxOnRent: taxOnRent * monthsInThisYear,
             annualTaxReimbursement: -Math.min(0, taxOnRent) * monthsInThisYear,
             annualNetCashFlow: netMonthlyCashFlow * monthsInThisYear,
-            cumulative: cumulativeCashFlow
+            cumulative: cumulativeCashFlow,
+            cumulativeIlliquid: cumulativeIlliquid,
+            totalCumulative: totalCumulative
         });
 
         cashFlowSchedule.push({
             month,
-            cumulative: cumulativeCashFlow
+            cumulative: cumulativeCashFlow,
+            cumulativeIlliquid: cumulativeIlliquid,
+            totalCumulative: totalCumulative
         });
     }
 

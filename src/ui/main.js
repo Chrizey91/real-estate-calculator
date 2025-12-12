@@ -494,14 +494,32 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
         type: 'line',
         data: {
             labels: monthlyData.map(d => d.year.toString()),
-            datasets: [{
-                label: 'Cumulative Cash Flow',
-                data: monthlyData.map(d => d.cumulative),
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
+            datasets: [
+                {
+                    label: 'Cumulative Liquid Cash Flow',
+                    data: monthlyData.map(d => d.cumulative),
+                    borderColor: '#3b82f6', // Blue-500
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: false,
+                    tension: 0.4
+                },
+                {
+                    label: 'Cumulative Illiquid Cash Flow (Equity)',
+                    data: monthlyData.map(d => d.cumulativeIlliquid),
+                    borderColor: '#0ea5e9', // Sky-500
+                    backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                    fill: false,
+                    tension: 0.4
+                },
+                {
+                    label: 'Total Cumulative Cash Flow',
+                    data: monthlyData.map(d => d.totalCumulative),
+                    borderColor: '#8b5cf6', // Violet-500
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }
+            ]
         },
         options: {
             responsive: true,
