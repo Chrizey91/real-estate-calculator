@@ -370,11 +370,12 @@ function performCalculations() {
         params.applyGermanTax,
         params.startMonth,
         params.startYear,
-        metrics.monthlyCashFlowSchedule
+        metrics.monthlyCashFlowSchedule,
+        metrics.breakEvenYears
     );
 }
 
-function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSchedule, showTaxChart, startMonth, startYear, monthlyCashFlowSchedule) {
+function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSchedule, showTaxChart, startMonth, startYear, monthlyCashFlowSchedule, breakEvenYears) {
     // Amortization passed here is now 'amortization' (original) but we want 'extendedAmortization' or 'fullAmortization'.
     // Actually, updateCharts receives 'amortization' as arg1.
     // In performCalculations, we call updateCharts(amortization, ...).
@@ -559,6 +560,9 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
 
     // Cumulative Cash Flow Chart - Uses same aggregated data
     if (cashFlowChart) cashFlowChart.destroy();
+
+    const breakEvenYear = breakEvenYears > 0 ? (startYear + Math.floor(breakEvenYears)).toString() : null;
+
     cashFlowChart = new Chart(document.getElementById('cashFlowChart'), {
         type: 'line',
         data: {
@@ -607,6 +611,30 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                     callbacks: {
                         label: (context) => formatCurrency(context.parsed.y)
                     }
+                },
+                annotation: {
+                    annotations: breakEvenYear ? {
+                        line1: {
+                            type: 'line',
+                            xMin: breakEvenYear,
+                            xMax: breakEvenYear,
+                            borderColor: '#ef4444',
+                            borderWidth: 3,
+                            label: {
+                                display: true,
+                                content: ['Break even', breakEvenYear],
+                                backgroundColor: '#ef4444',
+                                color: '#ffffff',
+                                font: {
+                                    weight: 'bold',
+                                    size: 11
+                                },
+                                padding: 6,
+                                position: 'center',
+                                yAdjust: -20
+                            }
+                        }
+                    } : {}
                 }
             },
             scales: {
