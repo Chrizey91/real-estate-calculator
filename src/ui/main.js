@@ -235,11 +235,17 @@ function updateResultsUI(metrics) {
 
     // Break-even Display
     if (metrics.breakEvenYears > 0) {
-        const breakEvenDateYear = startYear + Math.floor(metrics.breakEvenYears);
+        const startMonth = parseInt(inputs.startMonth.value);
+        const breakEvenDate = new Date(startYear, startMonth);
+        breakEvenDate.setMonth(breakEvenDate.getMonth() + Math.ceil(metrics.breakEvenYears * 12));
+        const breakEvenDateYear = breakEvenDate.getFullYear();
 
         // Calculate when max investment is reached
         const maxInvestmentYears = metrics.maxInvestmentAtYears || 0;
-        const maxInvestmentYear = startYear + Math.floor(maxInvestmentYears);
+        // Correct calculation for Max Investment Year too
+        const maxInvDate = new Date(startYear, startMonth);
+        maxInvDate.setMonth(maxInvDate.getMonth() + Math.ceil(maxInvestmentYears * 12));
+        const maxInvestmentYear = maxInvDate.getFullYear();
 
         results.breakEven.innerHTML = `
             Year ${breakEvenDateYear} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">(${metrics.breakEvenYears.toFixed(1)} years)</span>
@@ -561,7 +567,12 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
     // Cumulative Cash Flow Chart - Uses same aggregated data
     if (cashFlowChart) cashFlowChart.destroy();
 
-    const breakEvenYear = breakEvenYears > 0 ? (startYear + Math.floor(breakEvenYears)).toString() : null;
+    let breakEvenYearString = null;
+    if (breakEvenYears > 0) {
+        const date = new Date(startYear, startMonth);
+        date.setMonth(date.getMonth() + Math.ceil(breakEvenYears * 12));
+        breakEvenYearString = date.getFullYear().toString();
+    }
 
     cashFlowChart = new Chart(document.getElementById('cashFlowChart'), {
         type: 'line',
@@ -613,16 +624,16 @@ function updateCharts(amortization, cashFlowSchedule, roiSchedule, taxSavingsSch
                     }
                 },
                 annotation: {
-                    annotations: breakEvenYear ? {
+                    annotations: breakEvenYearString ? {
                         line1: {
                             type: 'line',
-                            xMin: breakEvenYear,
-                            xMax: breakEvenYear,
+                            xMin: breakEvenYearString,
+                            xMax: breakEvenYearString,
                             borderColor: '#ef4444',
                             borderWidth: 3,
                             label: {
                                 display: true,
-                                content: ['Break even', breakEvenYear],
+                                content: ['Break even', breakEvenYearString],
                                 backgroundColor: '#ef4444',
                                 color: '#ffffff',
                                 font: {
