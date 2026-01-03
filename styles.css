@@ -52,7 +52,7 @@ body {
 
 .charts-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: 2rem;
 }
 
@@ -780,6 +780,7 @@ select option {
         transform: translateX(0);
     }
 }
+
 /* Section Header with Share Button */
 .section-header {
     display: flex;
@@ -816,4 +817,12 @@ select option {
 .btn-icon svg {
     width: 18px;
     height: 18px;
+}
+
+/* Chart Enhancements */
+.chart-explanation {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
 }
